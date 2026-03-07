@@ -1,0 +1,60 @@
+HELP.md
+
+# =========================
+# Maven
+# =========================
+target/
+
+# =========================
+# Test directory
+# =========================
+src/test/
+
+# =========================
+# Application config
+# =========================
+src/main/resources/application.properties
+
+### STS ###
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+
+# =========================
+# IntelliJ IDEA
+# =========================
+.idea/
+*.iws
+*.iml
+*.ipr
+
+# =========================
+# VSCode
+# =========================
+.vscode/
+
+# =========================
+# Logs
+# =========================
+*.log
+
+# =========================
+# Java compiled files
+# =========================
+*.class
+
+# =========================
+# OS Files
+# =========================
+.DS_Store
+Thumbs.db
+
+# =========================
+# Temporary files
+# =========================
+*.tmp
+*.swp

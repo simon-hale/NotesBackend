@@ -1,0 +1,23 @@
+spring.application.name=set-name
+server.port=set-port
+spring.datasource.username=your-mysql-username
+spring.datasource.password=your-mysql-password
+spring.datasource.url=jdbc:mysql://localhost:3306/your-db?serverTimezone=Asia/Shanghai&useUnicode=true&characterEncoding=utf-8
+spring.datasource.driver-class-name=com.mysql.cj.jdbc.Driver
+
+mybatis-plus.global-config.field-strategy=IGNORED
+
+# ?????? / RAM ?? AK???????
+aliyun.access-key-id=${ALIYUN_ACCESS_KEY_ID}
+aliyun.access-key-secret=${ALIYUN_ACCESS_KEY_SECRET}
+
+# STS ?? ARN
+aliyun.role-arn=xxx:xxx::xxxxxxxxxxx:xxxx/xxxxxx(your-ram-user)
+
+# STS ?? Region??? OSS ? region?
+aliyun.region-id=your-oss-region-id
+
+# OSS ????
+aliyun.oss.bucket=your-oss-bucket-name
+aliyun.oss.region=your-oss-region
+aliyun.oss.domain=your-oss-domain
