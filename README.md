@@ -8,5 +8,5 @@ Backend architecture: Spring Boot + MySQL + Alibaba Cloud OSS, responsible for b
 
 This website also supports online preview of PDF, Markdown, and Office files, which is of course implemented on the [Frontend](https://github.com/simon-hale/NotesFrontend "click to jump").
 
-Additionally, the configuration file needs to be handled separately.
+Additionally, the configuration file `application.properties` needs to be handled separately.
 `cp application.properties.example application.properties`
