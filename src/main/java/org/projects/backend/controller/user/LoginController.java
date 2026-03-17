@@ -22,4 +22,8 @@ public class LoginController {
         return loginService.getToken(username, password);
     }
 
+    @PostMapping("/api/user/auto-login/")
+    public Map<String, String> tryLogin() {
+        return loginService.autoLogin();
+    }
 }

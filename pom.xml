@@ -11,7 +11,7 @@
 	<groupId>org.projects</groupId>
 	<artifactId>backend</artifactId>
     <packaging>jar</packaging>
-	<version>0.2.4</version>
+	<version>0.2.5</version>
 	<name>backend</name>
 	<description>backend</description>
 	<url/>
