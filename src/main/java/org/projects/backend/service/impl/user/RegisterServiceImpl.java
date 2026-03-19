@@ -6,6 +6,7 @@ import org.projects.backend.mapper.UserMapper;
 import org.projects.backend.pojo.Directory;
 import org.projects.backend.pojo.User;
 import org.projects.backend.service.user.RegisterService;
+import org.projects.backend.utils.LanguagesSelector;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -29,7 +30,7 @@ public class RegisterServiceImpl implements RegisterService {
     private PasswordEncoder passwordEncoder;
 
     @Override
-    public Map<String, String> registerAccount(String username, String password, String confirmedPassword) {
+    public Map<String, String> registerAccount(String username, String password, String confirmedPassword, String language) {
         Map<String, String> map = new HashMap<>();
 //        if(username == null || password == null || confirmedPassword == null) {
 //            map.put("error_message", "请输入用户名或密码");
@@ -78,7 +79,11 @@ public class RegisterServiceImpl implements RegisterService {
 //
 //        map.put("error_message", "success");
 
-        map.put("error_message", "本站暂不开放注册！");
+        switch (language) {
+            case LanguagesSelector.zh_CN: map.put("error_message", "本站暂不开放注册！"); break;
+            case LanguagesSelector.en_US:
+            default: map.put("error_message", "Registration is temporarily closed.");
+        }
 
         return map;
     }

@@ -17,6 +17,7 @@ public class DeleteAccountController {
     @PostMapping("/api/user/delete/")
     public JSONObject deleteAccount(@RequestParam Map<String, String> data) {
         String username = data.get("username");
-        return deleteAccount.deleteAccount(username);
+        String language = data.get("language");
+        return deleteAccount.deleteAccount(username, language);
     }
 }

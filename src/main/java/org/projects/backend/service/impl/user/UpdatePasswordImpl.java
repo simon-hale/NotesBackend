@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import org.projects.backend.mapper.UserMapper;
 import org.projects.backend.pojo.User;
 import org.projects.backend.service.user.UpdatePassword;
+import org.projects.backend.utils.LanguagesSelector;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -25,23 +26,35 @@ public class UpdatePasswordImpl implements UpdatePassword {
     private AuthenticationManager authenticationManager;
 
     @Override
-    public JSONObject updatePassword(String username, String password, String confirmedPassword) {
+    public JSONObject updatePassword(String username, String password, String confirmedPassword, String language) {
         QueryWrapper<User> queryWrapper = new QueryWrapper<>();
         queryWrapper.eq("username", username);
         List<User> user_list = userMapper.selectList(queryWrapper);
         JSONObject resp = new JSONObject();
         if(user_list.isEmpty()){
-            resp.put("error_message", "该用户不存在");
+            switch (language) {
+                case LanguagesSelector.zh_CN: resp.put("error_message", "该用户不存在"); break;
+                case LanguagesSelector.en_US:
+                default: resp.put("error_message", "User does not exist.");
+            }
             return resp;
         }
 
         if((password == null || password.isEmpty()) || (confirmedPassword == null || confirmedPassword.isEmpty())){
-            resp.put("error_message", "密码不能为空");
+            switch (language) {
+                case LanguagesSelector.zh_CN: resp.put("error_message", "密码不能为空"); break;
+                case LanguagesSelector.en_US:
+                default: resp.put("error_message", "Password cannot be empty.");
+            }
             return resp;
         }
 
         if(!password.equals(confirmedPassword)){
-            resp.put("error_message", "两次密码不一致");
+            switch (language) {
+                case LanguagesSelector.zh_CN: resp.put("error_message", "两次密码不一致"); break;
+                case LanguagesSelector.en_US:
+                default: resp.put("error_message", "The two passwords do not match.");
+            }
             return resp;
         }
 
@@ -53,7 +66,11 @@ public class UpdatePasswordImpl implements UpdatePassword {
             resp.put("error_message", "success");
             return resp;
         }else {
-            resp.put("error_message", "数据库错误，请联系管理员");
+            switch (language) {
+                case LanguagesSelector.zh_CN: resp.put("error_message", "数据库错误，请联系管理员"); break;
+                case LanguagesSelector.en_US:
+                default: resp.put("error_message", "Database error, please contact administrator.");
+            }
             return resp;
         }
     }

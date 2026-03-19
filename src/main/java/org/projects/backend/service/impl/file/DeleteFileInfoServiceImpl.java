@@ -9,6 +9,7 @@ import org.projects.backend.mapper.UserMapper;
 import org.projects.backend.pojo.File;
 import org.projects.backend.pojo.User;
 import org.projects.backend.service.file.DeleteFileInfoService;
+import org.projects.backend.utils.LanguagesSelector;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -36,15 +37,23 @@ public class DeleteFileInfoServiceImpl implements DeleteFileInfoService {
     private String domain;
 
     @Override
-    public JSONObject deleteFileById(Integer id, String username) {
+    public JSONObject deleteFileById(Integer id, String username, String language) {
         JSONObject resp = new JSONObject();
         File file = fileMapper.selectById(id);
         if (file == null) {
-            resp.put("error_message", "File does not exist.");
+            switch (language) {
+                case LanguagesSelector.zh_CN: resp.put("error_message", "文件不存在"); break;
+                case LanguagesSelector.en_US:
+                default: resp.put("error_message", "File does not exist.");
+            }
             return resp;
         }
         if (!userMapper.selectOne(new QueryWrapper<User>().eq("username", username)).getId().equals(file.getUserId())) {
-            resp.put("error_message", "Permission denied.");
+            switch (language) {
+                case LanguagesSelector.zh_CN: resp.put("error_message", "权限不足"); break;
+                case LanguagesSelector.en_US:
+                default: resp.put("error_message", "Permission denied.");
+            }
             return resp;
         }
         String objectKey = "user/" + file.getUserId() + "/" + file.getStringOfPath() + file.getName();

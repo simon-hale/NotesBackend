@@ -11,6 +11,7 @@ import org.projects.backend.pojo.Directory;
 import org.projects.backend.pojo.File;
 import org.projects.backend.pojo.User;
 import org.projects.backend.service.user.DeleteAccount;
+import org.projects.backend.utils.LanguagesSelector;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -44,18 +45,26 @@ public class DeleteAccountImpl implements DeleteAccount {
     private String domain;
 
     @Override
-    public JSONObject deleteAccount(String username) {
+    public JSONObject deleteAccount(String username, String language) {
         QueryWrapper<User> queryWrapper = new QueryWrapper<>();
         queryWrapper.eq("username", username);
         List<User> user_list = userMapper.selectList(queryWrapper);
         JSONObject resp = new JSONObject();
         if(user_list.isEmpty()){
-            resp.put("error_message", "该用户已被删除");
+            switch (language) {
+                case LanguagesSelector.zh_CN: resp.put("error_message", "该用户已被删除"); break;
+                case LanguagesSelector.en_US:
+                default: resp.put("error_message", "This user has been deleted.");
+            }
             return resp;
         }
 
         if(user_list.size()>1){
-            resp.put("error_message", "Same username more than once");
+            switch (language) {
+                case LanguagesSelector.zh_CN: resp.put("error_message", "存在多个相同用户名"); break;
+                case LanguagesSelector.en_US:
+                default: resp.put("error_message", "Same username more than once");
+            }
             return resp;
         }
 
@@ -81,7 +90,11 @@ public class DeleteAccountImpl implements DeleteAccount {
         if(result > 0){
             resp.put("error_message", "success");
         }else {
-            resp.put("error_message", "数据库错误，请联系管理员");
+            switch (language) {
+                case LanguagesSelector.zh_CN: resp.put("error_message", "数据库错误，请联系管理员"); break;
+                case LanguagesSelector.en_US:
+                default: resp.put("error_message", "Database error, please contact administrator.");
+            }
         }
         return resp;
     }

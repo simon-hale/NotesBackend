@@ -19,6 +19,7 @@ public class UpdatePasswordController {
         String username = data.get("username");
         String password = data.get("password");
         String confirmedPassword = data.get("confirmedPassword");
-        return updatePassword.updatePassword(username, password, confirmedPassword);
+        String language = data.get("language");
+        return updatePassword.updatePassword(username, password, confirmedPassword, language);
     }
 }

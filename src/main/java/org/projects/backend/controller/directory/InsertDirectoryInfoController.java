@@ -16,6 +16,6 @@ public class InsertDirectoryInfoController {
 
     @PostMapping("/api/directory/create/")
     JSONObject createDirectory(@RequestParam Map<String, String> data) {
-        return insertDirectoryInfoService.createDirectory(data.get("name"), Integer.valueOf(data.get("parent_id")), data.get("username"));
+        return insertDirectoryInfoService.createDirectory(data.get("name"), Integer.valueOf(data.get("parent_id")), data.get("username"), data.get("language"));
     }
 }

@@ -12,6 +12,7 @@ import org.projects.backend.pojo.Directory;
 import org.projects.backend.pojo.File;
 import org.projects.backend.pojo.User;
 import org.projects.backend.service.file.UpdateFileInfoService;
+import org.projects.backend.utils.LanguagesSelector;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -48,11 +49,15 @@ public class UpdateFileInfoServiceImpl implements UpdateFileInfoService {
     private String domain;
 
     @Override
-    public JSONObject modifyFileNameById(String username, Integer parentId, Integer fileId, String filenameNew){
+    public JSONObject modifyFileNameById(String username, Integer parentId, Integer fileId, String filenameNew, String language){
         JSONObject resp = new JSONObject();
 
         if (filenameNew == null || filenameNew.isEmpty()) {
-            resp.put("error_message", "Filename is null or empty.");
+            switch (language) {
+                case LanguagesSelector.zh_CN: resp.put("error_message", "文件名不能为空"); break;
+                case LanguagesSelector.en_US:
+                default: resp.put("error_message", "Filename is null or empty.");
+            }
             return resp;
         }
 
@@ -60,38 +65,72 @@ public class UpdateFileInfoServiceImpl implements UpdateFileInfoService {
         try {
             user = userMapper.selectOne(new QueryWrapper<User>().eq("username", username));
             if (user == null) {
-                resp.put("error_message", "User Not Exists.");
+                switch (language) {
+                    case LanguagesSelector.zh_CN: resp.put("error_message", "用户不存在"); break;
+                    case LanguagesSelector.en_US:
+                    default: resp.put("error_message", "User Not Exists.");
+                }
                 return resp;
             }
         } catch (Exception e) {
-            resp.put("error_message", "SQL error(User Info Enquiry).");
+            switch (language) {
+                case LanguagesSelector.zh_CN: resp.put("error_message", "SQL错误（用户信息查询）"); break;
+                case LanguagesSelector.en_US:
+                default: resp.put("error_message", "SQL error(User Info Enquiry).");
+            }
             return resp;
         }
 
         Directory directory = directoryMapper.selectById(parentId);
         if (directory == null) {
-            resp.put("error_message", "Directory Not Exists.");
+            switch (language) {
+                case LanguagesSelector.zh_CN: resp.put("error_message", "目标目录不存在"); break;
+                case LanguagesSelector.en_US:
+                default: resp.put("error_message", "Directory Not Exists.");
+            }
             return resp;
         } else if (!directory.getUserId().equals(user.getId())) {
-            resp.put("error_message", "User Id Not Match With Directory.");
+            switch (language) {
+                case LanguagesSelector.zh_CN: resp.put("error_message", "用户ID与目录不匹配"); break;
+                case LanguagesSelector.en_US:
+                default: resp.put("error_message", "User Id Not Match With Directory.");
+            }
             return resp;
         }
 
         File fileTarget = fileMapper.selectById(fileId);
         if (fileTarget == null) {
-            resp.put("error_message", "File Not Exists.");
+            switch (language) {
+                case LanguagesSelector.zh_CN: resp.put("error_message", "文件不存在"); break;
+                case LanguagesSelector.en_US:
+                default: resp.put("error_message", "File Not Exists.");
+            }
             return resp;
         }
         if (!fileTarget.getParentId().equals(directory.getId())
                 || !fileTarget.getUserId().equals(user.getId())) {
-            resp.put("error_message", "File Parent Id Mismatch With Directory Or User.");
+            switch (language) {
+                case LanguagesSelector.zh_CN: resp.put("error_message", "文件父目录ID与目录或用户不匹配"); break;
+                case LanguagesSelector.en_US:
+                default: resp.put("error_message", "File Parent Id Mismatch With Directory Or User.");
+            }
             return resp;
         }
 
         List<File> filesNewCheck = fileMapper.selectList(new QueryWrapper<File>().eq("name", filenameNew).eq("parent_id", parentId));
         if (!filesNewCheck.isEmpty()) {
-            if (filesNewCheck.size() > 1) resp.put("error_message", "Target files more than once in MySQL.");
-            else resp.put("error_message", "Target File Name Already Exists.");
+            if (filesNewCheck.size() > 1)
+                switch (language) {
+                    case LanguagesSelector.zh_CN: resp.put("error_message", "MySQL中存在多个目标文件"); break;
+                    case LanguagesSelector.en_US:
+                    default: resp.put("error_message", "Target files more than once in MySQL.");
+                }
+            else
+                switch (language) {
+                    case LanguagesSelector.zh_CN: resp.put("error_message", "目标文件名已存在"); break;
+                    case LanguagesSelector.en_US:
+                    default: resp.put("error_message", "Target File Name Already Exists.");
+                }
             return resp;
         }
 
@@ -111,17 +150,29 @@ public class UpdateFileInfoServiceImpl implements UpdateFileInfoService {
 
         try {
             if (!ossClient.doesObjectExist(bucket, objectKeyOld)) {
-                resp.put("error_message", "Origin file in MySQL but not in OSS.");
+                switch (language) {
+                    case LanguagesSelector.zh_CN: resp.put("error_message", "MySQL中存在源文件但OSS中不存在"); break;
+                    case LanguagesSelector.en_US:
+                    default: resp.put("error_message", "Origin file in MySQL but not in OSS.");
+                }
                 return resp;
             }
             if (ossClient.doesObjectExist(bucket, objectKeyNew)) {
-                resp.put("error_message", "Target file in OSS but not in MySQL.");
+                switch (language) {
+                    case LanguagesSelector.zh_CN: resp.put("error_message", "OSS中存在目标文件但MySQL中不存在"); break;
+                    case LanguagesSelector.en_US:
+                    default: resp.put("error_message", "Target file in OSS but not in MySQL.");
+                }
                 return resp;
             }
             ossClient.copyObject(bucket, objectKeyOld, bucket, objectKeyNew);
             ossClient.deleteObject(bucket, objectKeyOld);
         } catch (Exception e) {
-            resp.put("error_message", "OSS file rename failed.");
+            switch (language) {
+                case LanguagesSelector.zh_CN: resp.put("error_message", "OSS文件重命名失败"); break;
+                case LanguagesSelector.en_US:
+                default: resp.put("error_message", "OSS file rename failed.");
+            }
             return resp;
         } finally {
             ossClient.shutdown();
@@ -142,7 +193,11 @@ public class UpdateFileInfoServiceImpl implements UpdateFileInfoService {
             );
             resp.put("error_message", "success");
         } catch (Exception e) {
-            resp.put("error_message", "SQL error, but file renamed in OSS.");
+            switch (language) {
+                case LanguagesSelector.zh_CN: resp.put("error_message", "SQL错误，但OSS文件已重命名"); break;
+                case LanguagesSelector.en_US:
+                default: resp.put("error_message", "SQL error, but file renamed in OSS.");
+            }
         }
 
         return resp;

@@ -8,6 +8,7 @@ import org.projects.backend.mapper.UserMapper;
 import org.projects.backend.pojo.File;
 import org.projects.backend.pojo.User;
 import org.projects.backend.service.file.InsertFileInfoService;
+import org.projects.backend.utils.LanguagesSelector;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -44,11 +45,15 @@ public class InsertFileInfoServiceImpl implements InsertFileInfoService {
     private String domain;
 
     @Override
-    public JSONObject insertFileInfo(String username, String stringOfPath, String fileName, Integer parentId){
+    public JSONObject insertFileInfo(String username, String stringOfPath, String fileName, Integer parentId, String language){
         JSONObject resp = new JSONObject();
 
         if (fileName == null || fileName.isEmpty()) {
-            resp.put("error_message", "Filename is null or empty.");
+            switch (language) {
+                case LanguagesSelector.zh_CN: resp.put("error_message", "文件名不能为空"); break;
+                case LanguagesSelector.en_US:
+                default: resp.put("error_message", "Filename is null or empty.");
+            }
             return resp;
         }
 
@@ -56,7 +61,11 @@ public class InsertFileInfoServiceImpl implements InsertFileInfoService {
         try {
             userId = userMapper.selectOne(new QueryWrapper<User>().eq("username", username)).getId();
         } catch (Exception e) {
-            resp.put("error_message", "SQL error(User Info Enquiry).");
+            switch (language) {
+                case LanguagesSelector.zh_CN: resp.put("error_message", "SQL错误（用户信息查询）"); break;
+                case LanguagesSelector.en_US:
+                default: resp.put("error_message", "SQL error(User Info Enquiry).");
+            }
             return resp;
         }
 
@@ -73,7 +82,11 @@ public class InsertFileInfoServiceImpl implements InsertFileInfoService {
         }
 
         if (!exists) {
-            resp.put("error_message", "File Not Exists.");
+            switch (language) {
+                case LanguagesSelector.zh_CN: resp.put("error_message", "文件不存在"); break;
+                case LanguagesSelector.en_US:
+                default: resp.put("error_message", "File Not Exists.");
+            }
             return resp;
         }
 
@@ -83,7 +96,11 @@ public class InsertFileInfoServiceImpl implements InsertFileInfoService {
                 .eq("name", fileName));
         if (!curFileList.isEmpty()){
             if(curFileList.size()>1){
-                resp.put("error_message", "Same files more than once.");
+                switch (language) {
+                    case LanguagesSelector.zh_CN: resp.put("error_message", "存在多个同名文件"); break;
+                    case LanguagesSelector.en_US:
+                    default: resp.put("error_message", "Same files more than once.");
+                }
             }else {
                 if (curFileList.getFirst().getStringOfPath().equals(stringOfPath)) {
                     try {

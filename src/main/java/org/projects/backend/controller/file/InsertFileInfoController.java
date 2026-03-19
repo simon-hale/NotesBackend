@@ -20,7 +20,8 @@ public class InsertFileInfoController {
         String stringOfPath = data.get("string_of_path");
         String fileName = data.get("filename");
         Integer parentId = Integer.valueOf(data.get("parent_id"));
-        return insertFileInfoService.insertFileInfo(username, stringOfPath, fileName, parentId);
+        String language = data.get("language");
+        return insertFileInfoService.insertFileInfo(username, stringOfPath, fileName, parentId, language);
     }
 
 }

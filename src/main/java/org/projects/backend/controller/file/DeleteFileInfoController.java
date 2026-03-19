@@ -16,6 +16,6 @@ public class DeleteFileInfoController {
 
     @PostMapping("/api/file/delete/")
     JSONObject deleteFileById(@RequestParam Map<String, String> data) {
-        return deleteFileInfoService.deleteFileById(Integer.valueOf(data.get("id")), data.get("username"));
+        return deleteFileInfoService.deleteFileById(Integer.valueOf(data.get("id")), data.get("username"), data.get("language"));
     }
 }

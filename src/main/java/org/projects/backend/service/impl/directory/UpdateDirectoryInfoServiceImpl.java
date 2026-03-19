@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import org.projects.backend.mapper.DirectoryMapper;
 import org.projects.backend.pojo.Directory;
 import org.projects.backend.service.directory.UpdateDirectoryInfoService;
+import org.projects.backend.utils.LanguagesSelector;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -14,19 +15,31 @@ public class UpdateDirectoryInfoServiceImpl implements UpdateDirectoryInfoServic
     @Autowired
     private DirectoryMapper directoryMapper;
     @Override
-    public JSONObject modifyDirectoryNameById(Integer id, String name) {
+    public JSONObject modifyDirectoryNameById(Integer id, String name, String language) {
         JSONObject resp = new JSONObject();
         if (name == null || name.isEmpty()) {
-            resp.put("error_message", "Name is null or empty.");
+            switch (language) {
+                case LanguagesSelector.zh_CN: resp.put("error_message", "目录名不能为空"); break;
+                case LanguagesSelector.en_US:
+                default: resp.put("error_message", "Name is null or empty.");
+            }
             return resp;
         }
         if (name.equals("root") || name.equals("root_parent")) {
-            resp.put("error_message", "This name is not allowed.");
+            switch (language) {
+                case LanguagesSelector.zh_CN: resp.put("error_message", "该目录名不允许"); break;
+                case LanguagesSelector.en_US:
+                default: resp.put("error_message", "This name is not allowed.");
+            }
             return resp;
         }
         Directory directory = directoryMapper.selectById(id);
         if (directory == null) {
-            resp.put("error_message", "Directory does not exist.");
+            switch (language) {
+                case LanguagesSelector.zh_CN: resp.put("error_message", "目标目录不存在"); break;
+                case LanguagesSelector.en_US:
+                default: resp.put("error_message", "Directory does not exist.");
+            }
             return resp;
         }
         String oldName = directory.getName();
@@ -39,14 +52,22 @@ public class UpdateDirectoryInfoServiceImpl implements UpdateDirectoryInfoServic
                 .eq("parent_id", parentId)
                 .eq("name", oldName));
         if (countOld != 1) {
-            resp.put("error_message", "The number of old directory is not one.");
+            switch (language) {
+                case LanguagesSelector.zh_CN: resp.put("error_message", "旧目录数量不为1"); break;
+                case LanguagesSelector.en_US:
+                default: resp.put("error_message", "The number of old directory is not one.");
+            }
             return resp;
         }
         Long countNew = directoryMapper.selectCount(new QueryWrapper<Directory>()
                 .eq("parent_id", parentId)
                 .eq("name", name));
         if (countNew != 0) {
-            resp.put("error_message", "This name already exists in current directory.");
+            switch (language) {
+                case LanguagesSelector.zh_CN: resp.put("error_message", "该目录名在当前目录中已存在"); break;
+                case LanguagesSelector.en_US:
+                default: resp.put("error_message", "This name already exists in current directory.");
+            }
             return resp;
         }
         int modifySuccess = directoryMapper.update(

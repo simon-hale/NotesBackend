@@ -16,6 +16,6 @@ public class UpdateDirectoryInfoController {
 
     @PostMapping("/api/directory/modify/name/")
     JSONObject modifyDirectoryNameById(@RequestParam Map<String, String> data) {
-        return updateDirectoryInfoService.modifyDirectoryNameById(Integer.valueOf(data.get("id")), data.get("name"));
+        return updateDirectoryInfoService.modifyDirectoryNameById(Integer.valueOf(data.get("id")), data.get("name"), data.get("language"));
     }
 }
