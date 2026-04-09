@@ -125,12 +125,7 @@ public class UpdateFileInfoServiceImpl implements UpdateFileInfoService {
                     case LanguagesSelector.en_US:
                     default: resp.put("error_message", "Target files more than once in MySQL.");
                 }
-            else
-                switch (language) {
-                    case LanguagesSelector.zh_CN: resp.put("error_message", "目标文件名已存在"); break;
-                    case LanguagesSelector.en_US:
-                    default: resp.put("error_message", "Target File Name Already Exists.");
-                }
+            else resp.put("error_message", "success");
             return resp;
         }
 
