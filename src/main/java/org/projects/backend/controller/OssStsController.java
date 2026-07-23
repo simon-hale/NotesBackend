@@ -43,7 +43,17 @@ public class OssStsController {
     public Map<String, Object> getStsToken(@RequestParam Map<String, String> data) throws Exception {
         String username = data.get("username");
         String stringOfPath = data.get("string_of_path");
+        if (stringOfPath.length() > 1000) {
+            Map<String, Object> rejectResultPath = new HashMap<>();
+            rejectResultPath.put("error_message", "Path string max 1000 chars.");
+            return rejectResultPath;
+        }
         String fileName = data.get("filename");
+        if (fileName.length() > 100) {
+            Map<String, Object> rejectResultPath = new HashMap<>();
+            rejectResultPath.put("error_message", "File name max 100 chars.");
+            return rejectResultPath;
+        }
         String parentId = data.get("parent_id");
 
         // ① TODO：校验用户身份（JWT / Session）

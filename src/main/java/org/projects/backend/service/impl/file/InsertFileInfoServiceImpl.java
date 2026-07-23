@@ -14,7 +14,9 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -53,6 +55,24 @@ public class InsertFileInfoServiceImpl implements InsertFileInfoService {
                 case LanguagesSelector.zh_CN: resp.put("error_message", "文件名不能为空"); break;
                 case LanguagesSelector.en_US:
                 default: resp.put("error_message", "Filename is null or empty.");
+            }
+            return resp;
+        }
+
+        if (fileName.length() > 100) {
+            switch (language) {
+                case LanguagesSelector.zh_CN: resp.put("error_message", "文件名长度不能大于100个字符"); break;
+                case LanguagesSelector.en_US:
+                default: resp.put("error_message", "File name max 100 chars.");
+            }
+            return resp;
+        }
+
+        if (stringOfPath.length() > 1000) {
+            switch (language) {
+                case LanguagesSelector.zh_CN: resp.put("error_message", "文件绝对路径长度不能大于1000个字符"); break;
+                case LanguagesSelector.en_US:
+                default: resp.put("error_message", "Path string max 1000 chars.");
             }
             return resp;
         }

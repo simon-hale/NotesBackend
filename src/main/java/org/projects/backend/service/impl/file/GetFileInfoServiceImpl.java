@@ -84,7 +84,7 @@ public class GetFileInfoServiceImpl implements GetFileInfoService {
         }
 
         try {
-            Date expiration = new Date(System.currentTimeMillis() + 5 * 60 * 1000);
+            Date expiration = new Date(System.currentTimeMillis() + 10 * 60 * 1000);
             URL url = ossClient.generatePresignedUrl(
                     bucket,
                     objectKey,

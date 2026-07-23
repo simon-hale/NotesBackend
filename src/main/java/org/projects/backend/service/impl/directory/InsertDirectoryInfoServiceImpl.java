@@ -29,6 +29,14 @@ public class InsertDirectoryInfoServiceImpl implements InsertDirectoryInfoServic
             }
             return resp;
         }
+        if (name.length() > 100) {
+            switch (language) {
+                case LanguagesSelector.zh_CN: resp.put("error_message", "目录名长度不能大于100个字符"); break;
+                case LanguagesSelector.en_US:
+                default: resp.put("error_message", "Directory name max 100 chars.");
+            }
+            return resp;
+        }
         if(name.equals("root") || name.equals("root_parent")){
             switch (language) {
                 case LanguagesSelector.zh_CN: resp.put("error_message", "该目录名不被允许"); break;

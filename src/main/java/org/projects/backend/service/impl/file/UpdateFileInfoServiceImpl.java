@@ -61,6 +61,15 @@ public class UpdateFileInfoServiceImpl implements UpdateFileInfoService {
             return resp;
         }
 
+        if (filenameNew.length() > 100) {
+            switch (language) {
+                case LanguagesSelector.zh_CN: resp.put("error_message", "文件名长度不能大于100个字符"); break;
+                case LanguagesSelector.en_US:
+                default: resp.put("error_message", "File name max 100 chars.");
+            }
+            return resp;
+        }
+
         User user;
         try {
             user = userMapper.selectOne(new QueryWrapper<User>().eq("username", username));
