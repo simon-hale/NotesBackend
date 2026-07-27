@@ -71,7 +71,8 @@ public class OssStsController {
                 "oss:CompleteMultipartUpload",
                 "oss:GetObject",
                 "oss:HeadObject",
-                "oss:DeleteObject"
+                "oss:DeleteObject",
+                "oss:AbortMultipartUpload"
         ));
         statement.put("Resource", List.of(
                 "acs:oss:*:*:" + bucket + "/user/" + userId + "/*"
