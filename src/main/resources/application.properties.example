@@ -21,3 +21,6 @@ aliyun.region-id=your-oss-region-id
 aliyun.oss.bucket=your-oss-bucket-name
 aliyun.oss.region=your-oss-region
 aliyun.oss.domain=your-oss-domain
+
+# JWT
+jwt_key=your-jwt-key-string

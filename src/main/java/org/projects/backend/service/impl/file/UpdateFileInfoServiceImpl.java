@@ -126,25 +126,25 @@ public class UpdateFileInfoServiceImpl implements UpdateFileInfoService {
             return resp;
         }
 
-        List<File> filesNewCheck = fileMapper.selectList(new QueryWrapper<File>().eq("name", filenameNew).eq("parent_id", parentId));
+        List<File> filesNewCheck = fileMapper.selectList(new QueryWrapper<File>().eq("name", filenameNew).eq("parent_id", parentId).eq("user_id", user.getId()));
         if (!filesNewCheck.isEmpty()) {
-            if (filesNewCheck.size() > 1)
+            if (filesNewCheck.size() > 1) {
                 switch (language) {
                     case LanguagesSelector.zh_CN: resp.put("error_message", "MySQL中存在多个目标文件"); break;
                     case LanguagesSelector.en_US:
                     default: resp.put("error_message", "Target files more than once in MySQL.");
                 }
-            else resp.put("error_message", "success");
+            } else if (!filesNewCheck.getFirst().getId().equals(fileId)) {
+                switch (language) {
+                    case LanguagesSelector.zh_CN: resp.put("error_message", "已存在同名文件"); break;
+                    case LanguagesSelector.en_US:
+                    default: resp.put("error_message", "The file with the same name already exists.");
+                }
+            } else resp.put("error_message", "success");
             return resp;
         }
 
         LocalDateTime newTime = LocalDateTime.now().withNano(0);
-        LocalDateTime oldTime = fileTarget.getLastModifiedTime();
-
-        if (oldTime.equals(newTime) && filenameNew.equals(fileTarget.getName())) {
-            resp.put("error_message", "success");
-            return resp;
-        }
 
         String objectKeyOld = "user/" + fileTarget.getUserId() + "/" + fileTarget.getStringOfPath() + fileTarget.getName();
         String objectKeyNew = "user/" + fileTarget.getUserId() + "/" + fileTarget.getStringOfPath() + filenameNew;
@@ -169,41 +169,101 @@ public class UpdateFileInfoServiceImpl implements UpdateFileInfoService {
                 }
                 return resp;
             }
-            ossClient.copyObject(bucket, objectKeyOld, bucket, objectKeyNew);
-            ossClient.deleteObject(bucket, objectKeyOld);
+
+            try {
+                ossClient.copyObject(bucket, objectKeyOld, bucket, objectKeyNew);
+            } catch (Exception e) {
+                switch (language) {
+                    case LanguagesSelector.zh_CN: resp.put("error_message", "OSS文件复制失败"); break;
+                    case LanguagesSelector.en_US:
+                    default: resp.put("error_message", "OSS file copy failed.");
+                }
+                return resp;
+            }
+
+            Pattern pattern = Pattern.compile("\\.([^.]*)$");
+            Matcher matcher = pattern.matcher(filenameNew);
+            String type = matcher.find() ? matcher.group(1) : "null";
+            int updated;
+            try {
+                updated = fileMapper.update(
+                        null,
+                        new UpdateWrapper<File>()
+                                .eq("id", fileTarget.getId())
+                                .set("name", filenameNew)
+                                .set("last_modified_time", newTime)
+                                .set("type", type)
+                );
+            } catch (Exception e) {
+                try {
+                    ossClient.deleteObject(bucket, objectKeyNew);
+                } catch (Exception cleanupException) {
+                    switch (language) {
+                        case LanguagesSelector.zh_CN: resp.put("error_message", "SQL更新异常，且新OSS副本清理失败"); break;
+                        case LanguagesSelector.en_US:
+                        default: resp.put("error_message", "SQL update exception, and the new OSS copy could not be cleaned up.");
+                    }
+                    return resp;
+                }
+                switch (language) {
+                    case LanguagesSelector.zh_CN: resp.put("error_message", "SQL更新异常，OSS已撤销重命名"); break;
+                    case LanguagesSelector.en_US:
+                    default: resp.put("error_message", "SQL update exception. OSS rename has been undone.");
+                }
+                return resp;
+            }
+            if (updated != 1) {
+                try {
+                    ossClient.deleteObject(bucket, objectKeyNew);
+                } catch (Exception cleanupException) {
+                    switch (language) {
+                        case LanguagesSelector.zh_CN: resp.put("error_message", "SQL未成功更新文件记录，且新OSS副本清理失败"); break;
+                        case LanguagesSelector.en_US:
+                        default: resp.put("error_message", "File record was not updated, and the new OSS copy could not be cleaned up.");
+                    }
+                    return resp;
+                }
+                switch (language) {
+                    case LanguagesSelector.zh_CN: resp.put("error_message", "SQL未成功更新文件记录，OSS已撤销重命名"); break;
+                    case LanguagesSelector.en_US:
+                    default: resp.put("error_message", "File record was not updated. OSS rename has been undone.");
+                }
+                return resp;
+            }
+
+            try {
+                ossClient.deleteObject(bucket, objectKeyOld);
+            } catch (Exception e) {
+                resp.put("error_message", "success_oss_error");
+
+                switch (language) {
+                    case LanguagesSelector.zh_CN:
+                        resp.put(
+                                "warning_message",
+                                "文件已重命名，但旧OSS对象暂未删除"
+                        );
+                        break;
+                    case LanguagesSelector.en_US:
+                    default:
+                        resp.put(
+                                "warning_message",
+                                "The file was renamed, but the old OSS object was not deleted."
+                        );
+                }
+
+                return resp;
+            }
+            resp.put("error_message", "success");
+            return resp;
         } catch (Exception e) {
             switch (language) {
-                case LanguagesSelector.zh_CN: resp.put("error_message", "OSS文件重命名失败"); break;
+                case LanguagesSelector.zh_CN: resp.put("error_message", "OSS操作异常"); break;
                 case LanguagesSelector.en_US:
-                default: resp.put("error_message", "OSS file rename failed.");
+                default: resp.put("error_message", "OSS operation exception.");
             }
             return resp;
         } finally {
             ossClient.shutdown();
         }
-
-        Pattern pattern = Pattern.compile("\\.([^.]*)$");
-        Matcher matcher = pattern.matcher(filenameNew);
-        String type = matcher.find() ? matcher.group(1) : "null";
-
-        try {
-            fileMapper.update(
-                    null,
-                    new UpdateWrapper<File>()
-                            .eq("id", fileTarget.getId())
-                            .set("name", filenameNew)
-                            .set("last_modified_time", newTime)
-                            .set("type", type)
-            );
-            resp.put("error_message", "success");
-        } catch (Exception e) {
-            switch (language) {
-                case LanguagesSelector.zh_CN: resp.put("error_message", "SQL错误，但OSS文件已重命名"); break;
-                case LanguagesSelector.en_US:
-                default: resp.put("error_message", "SQL error, but file renamed in OSS.");
-            }
-        }
-
-        return resp;
     }
 }

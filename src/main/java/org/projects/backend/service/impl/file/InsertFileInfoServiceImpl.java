@@ -82,9 +82,9 @@ public class InsertFileInfoServiceImpl implements InsertFileInfoService {
             userId = userMapper.selectOne(new QueryWrapper<User>().eq("username", username)).getId();
         } catch (Exception e) {
             switch (language) {
-                case LanguagesSelector.zh_CN: resp.put("error_message", "SQL错误（用户信息查询）"); break;
+                case LanguagesSelector.zh_CN: resp.put("error_message", "用户不存在"); break;
                 case LanguagesSelector.en_US:
-                default: resp.put("error_message", "SQL error(User Info Enquiry).");
+                default: resp.put("error_message", "User does not exist.");
             }
             return resp;
         }
@@ -121,40 +121,17 @@ public class InsertFileInfoServiceImpl implements InsertFileInfoService {
                     case LanguagesSelector.en_US:
                     default: resp.put("error_message", "Same files more than once.");
                 }
-            }else {
-                if (curFileList.getFirst().getStringOfPath().equals(stringOfPath)) {
-                    try {
-                        fileMapper.update(
-                                null,
-                                new UpdateWrapper<File>()
-                                        .eq("id", curFileList.getFirst().getId())
-                                        .set("last_modified_time", LocalDateTime.now())
-                        );
-                        resp.put("error_message", "success");
-                    } catch (Exception e) {
-                        resp.put("error_message", "SQL error.");
-                    }
-                }else {
-                    try {
-                        OSS ossClientpdateDelete = new OSSClientBuilder()
-                                .build("https://" + ossRegion + domain, accessKeyId, accessKeySecret);
-                        String objectKeyUpdateDelete = "user/" + userId + "/" + curFileList.getFirst().getStringOfPath() + curFileList.getFirst().getName();
-                        ossClientpdateDelete.deleteObject(bucket, objectKeyUpdateDelete);
-                    } finally {
-                        ossClient.shutdown();
-                    }
-                    try {
-                        fileMapper.update(
-                                null,
-                                new UpdateWrapper<File>()
-                                        .eq("id", curFileList.getFirst().getId())
-                                        .set("last_modified_time", LocalDateTime.now())
-                                        .set("string_of_path", stringOfPath)
-                        );
-                        resp.put("error_message", "success");
-                    } catch (Exception e) {
-                        resp.put("error_message", "SQL error.");
-                    }
+            }else{
+                try {
+                    int updated = fileMapper.update(
+                            null,
+                            new UpdateWrapper<File>()
+                                    .eq("id", curFileList.getFirst().getId())
+                                    .set("last_modified_time", LocalDateTime.now())
+                    );
+                    resp.put("error_message", updated == 1 ? "success" : "SQL update error.");
+                } catch (Exception e) {
+                    resp.put("error_message", "SQL error.");
                 }
             }
             return resp;
@@ -175,9 +152,14 @@ public class InsertFileInfoServiceImpl implements InsertFileInfoService {
         String type = matcher.find() ? matcher.group(1) : "null";
         file.setType(type);
 
-        if(fileMapper.insert(file) == 1){
-            resp.put("error_message", "success");
-        }else{
+        try {
+            int inserted = fileMapper.insert(file);
+
+            resp.put(
+                    "error_message",
+                    inserted == 1 ? "success" : "SQL insert error."
+            );
+        } catch (Exception e) {
             resp.put("error_message", "SQL error.");
         }
 

@@ -4,6 +4,7 @@ import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtBuilder;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import javax.crypto.SecretKey;
@@ -18,11 +19,18 @@ import java.util.UUID;
 
 @Component
 public class JwtUtil {
+
+//    自定义的一个随机密钥，用来生成jwt令随牌，可以自行定义，但一定要随机
+    private static String jwtKey;
+//    赋值密钥
+    @Value("${jwt_key}")
+    public void setJwtKey(String jwtKey) {
+        JwtUtil.jwtKey = jwtKey;
+    }
+
 //    准备前置数据，用于创建令牌
 //    生存时间，默认为14天
     public static final long JWT_TTL = 60 * 60 * 1000L * 24 * 14;  // 有效期14天
-//    自定义的一个随机密钥，用来生成jwt令随牌，可以自行定义，但一定要随机
-    public static final String JWT_KEY = "SDFGjhdsfalshdfHFdsjkdsfds121232131afasdfac";
 //    获得去掉'-'字符的UUID，唯一标志jwt，作为token的一个组成部分
     public static String getUUID() {
         return UUID.randomUUID().toString().replaceAll("-", "");
@@ -59,7 +67,7 @@ public class JwtUtil {
 
 //    对密钥JWT_KEY进行处理
     public static SecretKey generalKey() {
-        byte[] encodeKey = Base64.getDecoder().decode(JwtUtil.JWT_KEY);
+        byte[] encodeKey = Base64.getDecoder().decode(jwtKey);
         return new SecretKeySpec(encodeKey, 0, encodeKey.length, "HmacSHA256");
     }
 

@@ -61,7 +61,16 @@ public class GetFileInfoServiceImpl implements GetFileInfoService {
             }
             return resp;
         }
-        if (!userMapper.selectOne(new QueryWrapper<User>().eq("username", username)).getId().equals(file.getUserId())) {
+        User user = userMapper.selectOne(new QueryWrapper<User>().eq("username", username));
+        if (user == null) {
+            switch (language) {
+                case LanguagesSelector.zh_CN: resp.put("error_message", "用户不存在"); break;
+                case LanguagesSelector.en_US:
+                default: resp.put("error_message", "User does not exist.");
+            }
+            return resp;
+        }
+        if (!user.getId().equals(file.getUserId())) {
             switch (language) {
                 case LanguagesSelector.zh_CN: resp.put("error_message", "权限不足"); break;
                 case LanguagesSelector.en_US:
@@ -74,17 +83,17 @@ public class GetFileInfoServiceImpl implements GetFileInfoService {
         OSS ossClient = new OSSClientBuilder()
                 .build("https://" + ossRegion + domain, accessKeyId, accessKeySecret);
 
-        if (!ossClient.doesObjectExist(bucket, objectKey)) {
-            switch (language) {
-                case LanguagesSelector.zh_CN: resp.put("error_message", "OSS对象不存在"); break;
-                case LanguagesSelector.en_US:
-                default: resp.put("error_message", "OSS object not found.");
-            }
-            return resp;
-        }
-
         try {
-            Date expiration = new Date(System.currentTimeMillis() + 10 * 60 * 1000);
+            if (!ossClient.doesObjectExist(bucket, objectKey)) {
+                switch (language) {
+                    case LanguagesSelector.zh_CN: resp.put("error_message", "OSS对象不存在"); break;
+                    case LanguagesSelector.en_US:
+                    default: resp.put("error_message", "OSS object not found.");
+                }
+                return resp;
+            }
+
+            Date expiration = new Date(System.currentTimeMillis() + 8 * 60 * 1000);
             URL url = ossClient.generatePresignedUrl(
                     bucket,
                     objectKey,
@@ -94,6 +103,9 @@ public class GetFileInfoServiceImpl implements GetFileInfoService {
             resp.put("url", url.toString());
             resp.put("type", file.getType());
             resp.put("error_message", "success");
+        } catch (Exception e) {
+            resp.put("error_message", "OSS operation failed.");
+            return resp;
         } finally {
             ossClient.shutdown();
         }

@@ -48,7 +48,16 @@ public class DeleteFileInfoServiceImpl implements DeleteFileInfoService {
             }
             return resp;
         }
-        if (!userMapper.selectOne(new QueryWrapper<User>().eq("username", username)).getId().equals(file.getUserId())) {
+        User user  = userMapper.selectOne(new QueryWrapper<User>().eq("username", username));
+        if (user == null) {
+            switch (language) {
+                case LanguagesSelector.zh_CN: resp.put("error_message", "用户不存在"); break;
+                case LanguagesSelector.en_US:
+                default: resp.put("error_message", "User does not exist.");
+            }
+            return resp;
+        }
+        if (!user.getId().equals(file.getUserId())) {
             switch (language) {
                 case LanguagesSelector.zh_CN: resp.put("error_message", "权限不足"); break;
                 case LanguagesSelector.en_US:
@@ -56,6 +65,21 @@ public class DeleteFileInfoServiceImpl implements DeleteFileInfoService {
             }
             return resp;
         }
+
+        int deleted;
+
+        try {
+            deleted = fileMapper.deleteById(id);
+        } catch (Exception e) {
+            resp.put("error_message", "SQL error.");
+            return resp;
+        }
+
+        if (deleted != 1) {
+            resp.put("error_message", "SQL delete error.");
+            return resp;
+        }
+
         String objectKey = "user/" + file.getUserId() + "/" + file.getStringOfPath() + file.getName();
 
         OSS ossClient = new OSSClientBuilder()
@@ -63,12 +87,12 @@ public class DeleteFileInfoServiceImpl implements DeleteFileInfoService {
 
         try {
             ossClient.deleteObject(bucket, objectKey);
+            resp.put("error_message", "success");
+        } catch (Exception e) {
+            resp.put("error_message", "Database deleted, but OSS cleanup failed.");
         } finally {
             ossClient.shutdown();
         }
-
-        if (fileMapper.deleteById(id) == 1) resp.put("error_message", "success");
-        else resp.put("error_message", "SQL error");
 
         return resp;
     }
