@@ -2,6 +2,7 @@ package org.projects.backend.controller.file;
 
 import com.alibaba.fastjson2.JSONObject;
 import org.projects.backend.service.file.InsertFileInfoService;
+import org.projects.backend.utils.LanguagesSelector;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -20,7 +21,7 @@ public class InsertFileInfoController {
         String stringOfPath = data.get("string_of_path");
         String fileName = data.get("filename");
         Integer parentId = Integer.valueOf(data.get("parent_id"));
-        String language = data.get("language");
+        String language = data.get("language") == null ? LanguagesSelector.en_US : data.get("language");
         return insertFileInfoService.insertFileInfo(username, stringOfPath, fileName, parentId, language);
     }
 

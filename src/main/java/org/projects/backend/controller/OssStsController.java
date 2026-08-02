@@ -8,6 +8,7 @@ import org.projects.backend.mapper.UserMapper;
 import org.projects.backend.pojo.File;
 import org.projects.backend.pojo.User;
 import org.projects.backend.service.STService;
+import org.projects.backend.utils.LanguagesSelector;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -42,16 +43,31 @@ public class OssStsController {
     @GetMapping("/sts/")
     public Map<String, Object> getStsToken(@RequestParam Map<String, String> data) throws Exception {
         String username = data.get("username");
+        String language = data.get("language") == null ? LanguagesSelector.en_US : data.get("language");
         String stringOfPath = data.get("string_of_path");
         if (stringOfPath.length() > 1000) {
             Map<String, Object> rejectResultPath = new HashMap<>();
-            rejectResultPath.put("error_message", "Path string max 1000 chars.");
+            switch (language) {
+                case LanguagesSelector.zh_CN:
+                    rejectResultPath.put("error_message", "路径长度不能超过1000个字符。");
+                    break;
+                case LanguagesSelector.en_US:
+                default:
+                    rejectResultPath.put("error_message", "Path cannot exceed 1000 characters.");
+            }
             return rejectResultPath;
         }
         String fileName = data.get("filename");
         if (fileName.length() > 100) {
             Map<String, Object> rejectResultPath = new HashMap<>();
-            rejectResultPath.put("error_message", "File name max 100 chars.");
+            switch (language) {
+                case LanguagesSelector.zh_CN:
+                    rejectResultPath.put("error_message", "文件名长度不能超过100个字符。");
+                    break;
+                case LanguagesSelector.en_US:
+                default:
+                    rejectResultPath.put("error_message", "File name cannot exceed 100 characters.");
+            }
             return rejectResultPath;
         }
         String parentId = data.get("parent_id");

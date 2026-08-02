@@ -1,6 +1,7 @@
 package org.projects.backend.controller.user;
 
 import org.projects.backend.service.user.RegisterService;
+import org.projects.backend.utils.LanguagesSelector;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -20,7 +21,7 @@ public class RegisterController {
         String username = map.get("username");
         String password = map.get("password");
         String confirmedPassword  = map.get("confirmedPassword");
-        String language = map.get("language");
+        String language = map.get("language") == null ? LanguagesSelector.en_US : map.get("language");
         return registerService.registerAccount(username, password, confirmedPassword, language);
     }
 

@@ -64,14 +64,13 @@ public class UpdatePasswordImpl implements UpdatePassword {
         int result = userMapper.update(updateWrapper);
         if(result > 0){
             resp.put("error_message", "success");
-            return resp;
         }else {
             switch (language) {
                 case LanguagesSelector.zh_CN: resp.put("error_message", "数据库错误，请联系管理员"); break;
                 case LanguagesSelector.en_US:
                 default: resp.put("error_message", "Database error, please contact administrator.");
             }
-            return resp;
         }
+        return resp;
     }
 }

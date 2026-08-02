@@ -23,7 +23,7 @@ public class JwtUtil {
 //    自定义的一个随机密钥，用来生成jwt令随牌，可以自行定义，但一定要随机
     private static String jwtKey;
 //    赋值密钥
-    @Value("${jwt_key}")
+    @Value("${jwt.key}")
     public void setJwtKey(String jwtKey) {
         JwtUtil.jwtKey = jwtKey;
     }

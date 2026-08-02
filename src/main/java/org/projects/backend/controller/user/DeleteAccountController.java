@@ -2,6 +2,7 @@ package org.projects.backend.controller.user;
 
 import com.alibaba.fastjson2.JSONObject;
 import org.projects.backend.service.user.DeleteAccount;
+import org.projects.backend.utils.LanguagesSelector;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -17,7 +18,7 @@ public class DeleteAccountController {
     @PostMapping("/api/user/delete/")
     public JSONObject deleteAccount(@RequestParam Map<String, String> data) {
         String username = data.get("username");
-        String language = data.get("language");
+        String language = data.get("language") == null ? LanguagesSelector.en_US : data.get("language");
         return deleteAccount.deleteAccount(username, language);
     }
 }

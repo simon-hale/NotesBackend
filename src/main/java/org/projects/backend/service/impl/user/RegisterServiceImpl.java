@@ -33,28 +33,63 @@ public class RegisterServiceImpl implements RegisterService {
     public Map<String, String> registerAccount(String username, String password, String confirmedPassword, String language) {
         Map<String, String> map = new HashMap<>();
 //        if(username == null || password == null || confirmedPassword == null) {
-//            map.put("error_message", "请输入用户名或密码");
+//            switch (language) {
+//                case LanguagesSelector.zh_CN:
+//                    map.put("error_message", "请输入用户名和密码。");
+//                    break;
+//                case LanguagesSelector.en_US:
+//                default:
+//                    map.put("error_message", "Please enter a username and password.");
+//            }
 //            return map;
 //        }
 //
-//        username = username.trim();  // 删除首位空白符
+//        username = username.trim();  // 删除首尾空白符
 //        if(username.isEmpty() || password.isEmpty() || confirmedPassword.isEmpty()) {
-//            map.put("error_message", "用户名和密码不能为空");
+//            switch (language) {
+//                case LanguagesSelector.zh_CN:
+//                    map.put("error_message", "用户名和密码不能为空。");
+//                    break;
+//                case LanguagesSelector.en_US:
+//                default:
+//                    map.put("error_message", "Username and password cannot be empty.");
+//            }
 //            return map;
 //        }
 //
 //        if(username.length() > 100) {
-//            map.put("error_message", "用户名长度不能大于100");
+//            switch (language) {
+//                case LanguagesSelector.zh_CN:
+//                    map.put("error_message", "用户名长度不能超过100个字符。");
+//                    break;
+//                case LanguagesSelector.en_US:
+//                default:
+//                    map.put("error_message", "Username cannot exceed 100 characters.");
+//            }
 //            return map;
 //        }
 //
 //        if(password.length() > 100 || confirmedPassword.length() > 100) {
-//            map.put("error_message", "密码长度不能大于100");
+//            switch (language) {
+//                case LanguagesSelector.zh_CN:
+//                    map.put("error_message", "密码长度不能超过100个字符。");
+//                    break;
+//                case LanguagesSelector.en_US:
+//                default:
+//                    map.put("error_message", "Password cannot exceed 100 characters.");
+//            }
 //            return map;
 //        }
 //
 //        if(!password.equals(confirmedPassword)) {
-//            map.put("error_message", "两次密码不一致");
+//            switch (language) {
+//                case LanguagesSelector.zh_CN:
+//                    map.put("error_message", "两次输入的密码不一致。");
+//                    break;
+//                case LanguagesSelector.en_US:
+//                default:
+//                    map.put("error_message", "The passwords do not match.");
+//            }
 //            return map;
 //        }
 //
@@ -62,7 +97,14 @@ public class RegisterServiceImpl implements RegisterService {
 //        queryWrapper.eq("username", username);
 //        List<User> users = userMapper.selectList(queryWrapper);
 //        if(!users.isEmpty()) {
-//            map.put("error_message", "用户名已存在");
+//            switch (language) {
+//                case LanguagesSelector.zh_CN:
+//                    map.put("error_message", "该用户名已存在。");
+//                    break;
+//                case LanguagesSelector.en_US:
+//                default:
+//                    map.put("error_message", "This username already exists.");
+//            }
 //            return map;
 //        }
 //
@@ -73,7 +115,7 @@ public class RegisterServiceImpl implements RegisterService {
 //
 //        Directory directory = new Directory();
 //        directory.setName("root");
-//        directory.setUserId(userMapper.selectOne(new QueryWrapper<User>().eq("username", username)).getId());
+//        directory.setUserId(user.getId());
 //        directory.setParentId(directoryMapper.selectOne(new QueryWrapper<Directory>().eq("name", "root_parent")).getId());
 //        directoryMapper.insert(directory);
 //
