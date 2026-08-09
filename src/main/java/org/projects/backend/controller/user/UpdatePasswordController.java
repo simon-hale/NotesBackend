@@ -17,10 +17,6 @@ public class UpdatePasswordController {
 
     @PostMapping("/api/user/update/password/")
     public JSONObject updatePassword(@RequestParam Map<String, String> data) {
-        String username = data.get("username");
-        String password = data.get("password");
-        String confirmedPassword = data.get("confirmedPassword");
-        String language = data.get("language") == null ? LanguagesSelector.en_US : data.get("language");
-        return updatePassword.updatePassword(username, password, confirmedPassword, language);
+        return updatePassword.updatePassword(data.get("cur_password"), data.get("password"), data.get("confirmedPassword"), data.get("language") == null ? LanguagesSelector.en_US : data.get("language"));
     }
 }

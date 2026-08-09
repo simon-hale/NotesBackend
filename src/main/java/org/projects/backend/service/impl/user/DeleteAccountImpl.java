@@ -11,9 +11,11 @@ import org.projects.backend.pojo.Directory;
 import org.projects.backend.pojo.File;
 import org.projects.backend.pojo.User;
 import org.projects.backend.service.user.DeleteAccount;
+import org.projects.backend.utils.AccessTokenExtractor;
 import org.projects.backend.utils.LanguagesSelector;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -44,31 +46,33 @@ public class DeleteAccountImpl implements DeleteAccount {
     @Value("${aliyun.oss.domain}")
     private String domain;
 
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+
+    @Autowired
+    private AccessTokenExtractor accessTokenExtractor;
+
     @Override
-    public JSONObject deleteAccount(String username, String language) {
-        QueryWrapper<User> queryWrapper = new QueryWrapper<>();
-        queryWrapper.eq("username", username);
-        List<User> user_list = userMapper.selectList(queryWrapper);
+    public JSONObject deleteAccount(String curPassword, String language) {
         JSONObject resp = new JSONObject();
-        if(user_list.isEmpty()){
+        User user = accessTokenExtractor.getCurrentUser();
+        if (curPassword == null || curPassword.isBlank()) {
             switch (language) {
-                case LanguagesSelector.zh_CN: resp.put("error_message", "该用户已被删除"); break;
+                case LanguagesSelector.zh_CN: resp.put("error_message", "原密码不能为空"); break;
                 case LanguagesSelector.en_US:
-                default: resp.put("error_message", "This user has been deleted.");
+                default:
+                    resp.put("error_message", "Original password cannot be empty.");
             }
             return resp;
         }
-
-        if(user_list.size()>1){
+        if(!passwordEncoder.matches(curPassword, user.getPassword())){
             switch (language) {
-                case LanguagesSelector.zh_CN: resp.put("error_message", "存在多个相同用户名"); break;
+                case LanguagesSelector.zh_CN: resp.put("error_message", "原密码不正确"); break;
                 case LanguagesSelector.en_US:
-                default: resp.put("error_message", "Same username more than once");
+                default: resp.put("error_message", "Incorrect original password.");
             }
             return resp;
         }
-
-        User user = user_list.getFirst();
         List<File> fileList = fileMapper.selectList(new QueryWrapper<File>().eq("user_id", user.getId()));
 
         OSS ossClient = new OSSClientBuilder()
