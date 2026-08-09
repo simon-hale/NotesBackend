@@ -56,7 +56,7 @@ public class DeleteAccountImpl implements DeleteAccount {
     public JSONObject deleteAccount(String curPassword, String language) {
         JSONObject resp = new JSONObject();
         User user = accessTokenExtractor.getCurrentUser();
-        if (curPassword == null || curPassword.isBlank()) {
+        if (curPassword == null || curPassword.isEmpty()) {
             switch (language) {
                 case LanguagesSelector.zh_CN: resp.put("error_message", "原密码不能为空"); break;
                 case LanguagesSelector.en_US:

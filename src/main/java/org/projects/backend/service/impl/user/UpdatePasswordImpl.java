@@ -30,7 +30,7 @@ public class UpdatePasswordImpl implements UpdatePassword {
         User user = accessTokenExtractor.getCurrentUser();
         Integer userId = user.getId();
 
-        if (curPassword == null || curPassword.isBlank()) {
+        if (curPassword == null || curPassword.isEmpty()) {
             switch (language) {
                 case LanguagesSelector.zh_CN: resp.put("error_message", "原密码不能为空"); break;
                 case LanguagesSelector.en_US:
@@ -40,7 +40,7 @@ public class UpdatePasswordImpl implements UpdatePassword {
             return resp;
         }
 
-        if(password == null || password.isBlank() || (confirmedPassword == null || confirmedPassword.isBlank())){
+        if(password == null || password.isEmpty() || (confirmedPassword == null || confirmedPassword.isEmpty())){
             switch (language) {
                 case LanguagesSelector.zh_CN: resp.put("error_message", "新密码不能为空"); break;
                 case LanguagesSelector.en_US:
