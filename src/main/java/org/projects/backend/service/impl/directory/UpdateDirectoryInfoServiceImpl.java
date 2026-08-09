@@ -4,22 +4,26 @@ import com.alibaba.fastjson2.JSONObject;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import org.projects.backend.mapper.DirectoryMapper;
-import org.projects.backend.mapper.UserMapper;
 import org.projects.backend.pojo.Directory;
-import org.projects.backend.pojo.User;
 import org.projects.backend.service.directory.UpdateDirectoryInfoService;
+import org.projects.backend.utils.AccessTokenExtractor;
 import org.projects.backend.utils.LanguagesSelector;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.util.Objects;
+
 @Service
 public class UpdateDirectoryInfoServiceImpl implements UpdateDirectoryInfoService {
+
     @Autowired
     private DirectoryMapper directoryMapper;
+
     @Autowired
-    private UserMapper userMapper;
+    private AccessTokenExtractor accessTokenExtractor;
+
     @Override
-    public JSONObject modifyDirectoryNameById(Integer id, String name, String username, String language) {
+    public JSONObject modifyDirectoryNameById(Integer id, String name, String language) {
         JSONObject resp = new JSONObject();
         if (name == null || name.isEmpty()) {
             switch (language) {
@@ -54,22 +58,12 @@ public class UpdateDirectoryInfoServiceImpl implements UpdateDirectoryInfoServic
             }
             return resp;
         }
-        QueryWrapper<User> queryWrapper = new QueryWrapper<>();
-        queryWrapper.eq("username", username);
-        User user = userMapper.selectOne(queryWrapper);
-        if (user == null) {
+        Integer userId = accessTokenExtractor.getCurrentUserId();
+        if (!Objects.equals(userId, directory.getUserId())) {
             switch (language) {
-                case LanguagesSelector.zh_CN: resp.put("error_message", "用户不存在"); break;
+                case LanguagesSelector.zh_CN: resp.put("error_message", "未授权的操作"); break;
                 case LanguagesSelector.en_US:
-                default: resp.put("error_message", "User does not exist.");
-            }
-            return resp;
-        }
-        if (!user.getId().equals(directory.getUserId())) {
-            switch (language) {
-                case LanguagesSelector.zh_CN: resp.put("error_message", "权限不足"); break;
-                case LanguagesSelector.en_US:
-                default: resp.put("error_message", "Permission denied.");
+                default: resp.put("error_message", "Unauthorized operation.");
             }
             return resp;
         }

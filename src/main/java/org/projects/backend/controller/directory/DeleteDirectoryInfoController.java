@@ -17,6 +17,6 @@ public class DeleteDirectoryInfoController {
 
     @PostMapping("/api/directory/delete/")
     JSONObject deleteDirectoryById(@RequestParam Map<String, String> data) {
-        return deleteDirectoryInfoService.deleteDirectoryById(Integer.valueOf(data.get("id")), data.get("username"), data.get("language") == null ? LanguagesSelector.en_US : data.get("language"));
+        return deleteDirectoryInfoService.deleteDirectoryById(Integer.valueOf(data.get("id")), data.get("language") == null ? LanguagesSelector.en_US : data.get("language"));
     }
 }

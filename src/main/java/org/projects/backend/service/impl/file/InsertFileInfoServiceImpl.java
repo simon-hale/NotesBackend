@@ -4,19 +4,16 @@ import com.alibaba.fastjson2.JSONObject;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import org.projects.backend.mapper.FileMapper;
-import org.projects.backend.mapper.UserMapper;
 import org.projects.backend.pojo.File;
-import org.projects.backend.pojo.User;
 import org.projects.backend.service.file.InsertFileInfoService;
+import org.projects.backend.utils.AccessTokenExtractor;
 import org.projects.backend.utils.LanguagesSelector;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -25,9 +22,6 @@ import com.aliyun.oss.OSSClientBuilder;
 
 @Service
 public class InsertFileInfoServiceImpl implements InsertFileInfoService {
-    @Autowired
-    private UserMapper userMapper;
-
     @Autowired
     private FileMapper fileMapper;
 
@@ -46,8 +40,11 @@ public class InsertFileInfoServiceImpl implements InsertFileInfoService {
     @Value("${aliyun.oss.domain}")
     private String domain;
 
+    @Autowired
+    private AccessTokenExtractor accessTokenExtractor;
+
     @Override
-    public JSONObject insertFileInfo(String username, String stringOfPath, String fileName, Integer parentId, String language){
+    public JSONObject insertFileInfo(String stringOfPath, String fileName, Integer parentId, String language){
         JSONObject resp = new JSONObject();
 
         if (fileName == null || fileName.isEmpty()) {
@@ -77,17 +74,7 @@ public class InsertFileInfoServiceImpl implements InsertFileInfoService {
             return resp;
         }
 
-        Integer userId;
-        try {
-            userId = userMapper.selectOne(new QueryWrapper<User>().eq("username", username)).getId();
-        } catch (Exception e) {
-            switch (language) {
-                case LanguagesSelector.zh_CN: resp.put("error_message", "用户不存在"); break;
-                case LanguagesSelector.en_US:
-                default: resp.put("error_message", "User does not exist.");
-            }
-            return resp;
-        }
+        Integer userId = accessTokenExtractor.getCurrentUserId();
 
         String objectKey = "user/" + userId + "/" + stringOfPath + fileName;
 

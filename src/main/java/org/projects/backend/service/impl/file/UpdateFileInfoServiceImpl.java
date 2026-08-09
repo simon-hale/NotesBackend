@@ -7,11 +7,10 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import org.projects.backend.mapper.DirectoryMapper;
 import org.projects.backend.mapper.FileMapper;
-import org.projects.backend.mapper.UserMapper;
 import org.projects.backend.pojo.Directory;
 import org.projects.backend.pojo.File;
-import org.projects.backend.pojo.User;
 import org.projects.backend.service.file.UpdateFileInfoService;
+import org.projects.backend.utils.AccessTokenExtractor;
 import org.projects.backend.utils.LanguagesSelector;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -19,13 +18,12 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Objects;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 @Service
 public class UpdateFileInfoServiceImpl implements UpdateFileInfoService {
-    @Autowired
-    private UserMapper userMapper;
 
     @Autowired
     private FileMapper fileMapper;
@@ -48,8 +46,11 @@ public class UpdateFileInfoServiceImpl implements UpdateFileInfoService {
     @Value("${aliyun.oss.domain}")
     private String domain;
 
+    @Autowired
+    private AccessTokenExtractor accessTokenExtractor;
+
     @Override
-    public JSONObject modifyFileNameById(String username, Integer parentId, Integer fileId, String filenameNew, String language){
+    public JSONObject modifyFileNameById(Integer parentId, Integer fileId, String filenameNew, String language){
         JSONObject resp = new JSONObject();
 
         if (filenameNew == null || filenameNew.isEmpty()) {
@@ -70,25 +71,7 @@ public class UpdateFileInfoServiceImpl implements UpdateFileInfoService {
             return resp;
         }
 
-        User user;
-        try {
-            user = userMapper.selectOne(new QueryWrapper<User>().eq("username", username));
-            if (user == null) {
-                switch (language) {
-                    case LanguagesSelector.zh_CN: resp.put("error_message", "用户不存在"); break;
-                    case LanguagesSelector.en_US:
-                    default: resp.put("error_message", "User Not Exists.");
-                }
-                return resp;
-            }
-        } catch (Exception e) {
-            switch (language) {
-                case LanguagesSelector.zh_CN: resp.put("error_message", "SQL错误（用户信息查询）"); break;
-                case LanguagesSelector.en_US:
-                default: resp.put("error_message", "SQL error(User Info Enquiry).");
-            }
-            return resp;
-        }
+        Integer userId = accessTokenExtractor.getCurrentUserId();
 
         Directory directory = directoryMapper.selectById(parentId);
         if (directory == null) {
@@ -98,11 +81,11 @@ public class UpdateFileInfoServiceImpl implements UpdateFileInfoService {
                 default: resp.put("error_message", "Directory Not Exists.");
             }
             return resp;
-        } else if (!directory.getUserId().equals(user.getId())) {
+        } else if (!Objects.equals(userId, directory.getUserId())) {
             switch (language) {
-                case LanguagesSelector.zh_CN: resp.put("error_message", "用户ID与目录不匹配"); break;
+                case LanguagesSelector.zh_CN: resp.put("error_message", "未授权的操作"); break;
                 case LanguagesSelector.en_US:
-                default: resp.put("error_message", "User Id Not Match With Directory.");
+                default: resp.put("error_message", "Unauthorized operation.");
             }
             return resp;
         }
@@ -116,8 +99,8 @@ public class UpdateFileInfoServiceImpl implements UpdateFileInfoService {
             }
             return resp;
         }
-        if (!fileTarget.getParentId().equals(directory.getId())
-                || !fileTarget.getUserId().equals(user.getId())) {
+        if (!Objects.equals(fileTarget.getParentId(), directory.getId())
+                || !Objects.equals(fileTarget.getUserId(), userId)) {
             switch (language) {
                 case LanguagesSelector.zh_CN: resp.put("error_message", "文件父目录ID与目录或用户不匹配"); break;
                 case LanguagesSelector.en_US:
@@ -126,7 +109,7 @@ public class UpdateFileInfoServiceImpl implements UpdateFileInfoService {
             return resp;
         }
 
-        List<File> filesNewCheck = fileMapper.selectList(new QueryWrapper<File>().eq("name", filenameNew).eq("parent_id", parentId).eq("user_id", user.getId()));
+        List<File> filesNewCheck = fileMapper.selectList(new QueryWrapper<File>().eq("name", filenameNew).eq("parent_id", parentId).eq("user_id", userId));
         if (!filesNewCheck.isEmpty()) {
             if (filesNewCheck.size() > 1) {
                 switch (language) {

@@ -3,12 +3,10 @@ package org.projects.backend.service.impl.file;
 import com.alibaba.fastjson2.JSONObject;
 import com.aliyun.oss.OSS;
 import com.aliyun.oss.OSSClientBuilder;
-import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import org.projects.backend.mapper.FileMapper;
-import org.projects.backend.mapper.UserMapper;
 import org.projects.backend.pojo.File;
-import org.projects.backend.pojo.User;
 import org.projects.backend.service.file.GetFileInfoService;
+import org.projects.backend.utils.AccessTokenExtractor;
 import org.projects.backend.utils.LanguagesSelector;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -16,13 +14,12 @@ import org.springframework.stereotype.Service;
 
 import java.net.URL;
 import java.util.Date;
+import java.util.Objects;
 
 @Service
 public class GetFileInfoServiceImpl implements GetFileInfoService {
     @Autowired
     private FileMapper fileMapper;
-    @Autowired
-    private UserMapper userMapper;
 
     @Value("${aliyun.oss.region}")
     private String ossRegion;
@@ -39,6 +36,9 @@ public class GetFileInfoServiceImpl implements GetFileInfoService {
     @Value("${aliyun.oss.domain}")
     private String domain;
 
+    @Autowired
+    private AccessTokenExtractor accessTokenExtractor;
+
     @Override
     public JSONObject getAllFileInfoByParentId(Integer parentId, Integer userId) {
         return null;
@@ -50,7 +50,7 @@ public class GetFileInfoServiceImpl implements GetFileInfoService {
     }
 
     @Override
-    public JSONObject getFileURL(Integer id, String username, String language) {
+    public JSONObject getFileURL(Integer id, String language) {
         JSONObject resp = new JSONObject();
         File file = fileMapper.selectById(id);
         if (file == null) {
@@ -61,16 +61,8 @@ public class GetFileInfoServiceImpl implements GetFileInfoService {
             }
             return resp;
         }
-        User user = userMapper.selectOne(new QueryWrapper<User>().eq("username", username));
-        if (user == null) {
-            switch (language) {
-                case LanguagesSelector.zh_CN: resp.put("error_message", "用户不存在"); break;
-                case LanguagesSelector.en_US:
-                default: resp.put("error_message", "User does not exist.");
-            }
-            return resp;
-        }
-        if (!user.getId().equals(file.getUserId())) {
+        Integer userId = accessTokenExtractor.getCurrentUserId();
+        if (!Objects.equals(userId, file.getUserId())) {
             switch (language) {
                 case LanguagesSelector.zh_CN: resp.put("error_message", "权限不足"); break;
                 case LanguagesSelector.en_US:

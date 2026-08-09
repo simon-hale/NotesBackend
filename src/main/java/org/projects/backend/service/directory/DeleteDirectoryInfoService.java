@@ -3,5 +3,5 @@ package org.projects.backend.service.directory;
 import com.alibaba.fastjson2.JSONObject;
 
 public interface DeleteDirectoryInfoService {
-    JSONObject deleteDirectoryById(Integer id, String username, String language);
+    JSONObject deleteDirectoryById(Integer id, String language);
 }

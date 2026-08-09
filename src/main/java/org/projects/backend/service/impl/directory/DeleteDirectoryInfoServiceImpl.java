@@ -4,28 +4,31 @@ import com.alibaba.fastjson2.JSONObject;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import org.projects.backend.mapper.DirectoryMapper;
 import org.projects.backend.mapper.FileMapper;
-import org.projects.backend.mapper.UserMapper;
 import org.projects.backend.pojo.Directory;
 import org.projects.backend.pojo.File;
-import org.projects.backend.pojo.User;
 import org.projects.backend.service.directory.DeleteDirectoryInfoService;
+import org.projects.backend.utils.AccessTokenExtractor;
 import org.projects.backend.utils.LanguagesSelector;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Objects;
 
 @Service
 public class DeleteDirectoryInfoServiceImpl implements DeleteDirectoryInfoService {
+
     @Autowired
     private DirectoryMapper directoryMapper;
+
     @Autowired
     private FileMapper fileMapper;
+
     @Autowired
-    private UserMapper userMapper;
+    private AccessTokenExtractor accessTokenExtractor;
 
     @Override
-    public JSONObject deleteDirectoryById(Integer id, String username, String language) {
+    public JSONObject deleteDirectoryById(Integer id, String language) {
         JSONObject resp = new JSONObject();
         Directory directory = directoryMapper.selectById(id);
         if (directory == null) {
@@ -36,22 +39,12 @@ public class DeleteDirectoryInfoServiceImpl implements DeleteDirectoryInfoServic
             }
             return resp;
         }
-        QueryWrapper<User> queryWrapper = new QueryWrapper<>();
-        queryWrapper.eq("username", username);
-        User user = userMapper.selectOne(queryWrapper);
-        if (user == null) {
+        Integer userId = accessTokenExtractor.getCurrentUserId();
+        if (!Objects.equals(userId, directory.getUserId())) {
             switch (language) {
-                case LanguagesSelector.zh_CN: resp.put("error_message", "用户不存在"); break;
+                case LanguagesSelector.zh_CN: resp.put("error_message", "未授权的操作"); break;
                 case LanguagesSelector.en_US:
-                default: resp.put("error_message", "User does not exist.");
-            }
-            return resp;
-        }
-        if (!user.getId().equals(directory.getUserId())) {
-            switch (language) {
-                case LanguagesSelector.zh_CN: resp.put("error_message", "权限不足"); break;
-                case LanguagesSelector.en_US:
-                default: resp.put("error_message", "Permission denied.");
+                default: resp.put("error_message", "Unauthorized operation.");
             }
             return resp;
         }

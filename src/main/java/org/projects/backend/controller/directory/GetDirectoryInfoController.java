@@ -16,13 +16,13 @@ public class GetDirectoryInfoController {
     private GetDirectoryInfoService getDirectoryInfoService;
 
     @PostMapping("/api/directory/init/")
-    JSONObject getDirectoryInfoInit(@RequestParam Map<String, String> data) {
-        return getDirectoryInfoService.getAllDirectoryInfoByInit(data.get("username"));
+    JSONObject getDirectoryInfoInit() {
+        return getDirectoryInfoService.getAllDirectoryInfoByInit();
     }
 
     @PostMapping("/api/directory/id/")
     JSONObject getDirectoryInfoByParentId(@RequestParam Map<String, String> data) {
-        return getDirectoryInfoService.getAllDirectoryInfoByParentId(Integer.valueOf(data.get("parent_id")), data.get("username"));
+        return getDirectoryInfoService.getAllDirectoryInfoByParentId(Integer.valueOf(data.get("parent_id")));
     }
 
 }

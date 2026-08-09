@@ -17,6 +17,6 @@ public class GetFileInfoController {
 
     @PostMapping("/api/file/url/")
     JSONObject getFileURL(@RequestParam Map<String, String> data) {
-        return getFileInfoService.getFileURL(Integer.valueOf(data.get("id")), data.get("username"), data.get("language") == null ? LanguagesSelector.en_US : data.get("language"));
+        return getFileInfoService.getFileURL(Integer.valueOf(data.get("id")), data.get("language") == null ? LanguagesSelector.en_US : data.get("language"));
     }
 }
