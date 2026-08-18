@@ -50,9 +50,56 @@ public class GetFileInfoServiceImpl implements GetFileInfoService {
     }
 
     @Override
-    public JSONObject getFileURL(Integer id, String language) {
+    public JSONObject getFileURL(String idString, String language) {
         JSONObject resp = new JSONObject();
-        File file = fileMapper.selectById(id);
+        if (idString == null || idString.isBlank()) {
+            switch (language) {
+                case LanguagesSelector.zh_CN:
+                    resp.put("error_message", "文件 ID 不能为空。");
+                    break;
+                case LanguagesSelector.en_US:
+                default:
+                    resp.put(
+                            "error_message",
+                            "The file ID cannot be empty."
+                    );
+            }
+            return resp;
+        }
+        Integer id;
+        try {
+            id = Integer.valueOf(idString.trim());
+        } catch (NumberFormatException e) {
+            switch (language) {
+                case LanguagesSelector.zh_CN:
+                    resp.put("error_message", "文件 ID 格式不正确。");
+                    break;
+                case LanguagesSelector.en_US:
+                default:
+                    resp.put(
+                            "error_message",
+                            "The file ID is invalid."
+                    );
+            }
+            return resp;
+        }
+        File file;
+        try {
+            file = fileMapper.selectById(id);
+        } catch (Exception e) {
+            switch (language) {
+                case LanguagesSelector.zh_CN:
+                    resp.put("error_message", "目标文件查询出错。");
+                    break;
+                case LanguagesSelector.en_US:
+                default:
+                    resp.put(
+                            "error_message",
+                            "Error querying the target file."
+                    );
+            }
+            return resp;
+        }
         if (file == null) {
             switch (language) {
                 case LanguagesSelector.zh_CN: resp.put("error_message", "文件不存在"); break;
@@ -72,8 +119,18 @@ public class GetFileInfoServiceImpl implements GetFileInfoService {
         }
         String objectKey = "user/" + file.getUserId() + "/" + file.getStringOfPath() + file.getName();
 
-        OSS ossClient = new OSSClientBuilder()
-                .build("https://" + ossRegion + domain, accessKeyId, accessKeySecret);
+        OSS ossClient;
+        try {
+            ossClient = new OSSClientBuilder()
+                    .build("https://" + ossRegion + domain, accessKeyId, accessKeySecret);
+        } catch (Exception e) {
+            switch (language) {
+                case LanguagesSelector.zh_CN: resp.put("error_message", "OSS客户端创建失败"); break;
+                case LanguagesSelector.en_US:
+                default: resp.put("error_message", "Error building OSS client.");
+            }
+            return resp;
+        }
 
         try {
             if (!ossClient.doesObjectExist(bucket, objectKey)) {
@@ -85,7 +142,7 @@ public class GetFileInfoServiceImpl implements GetFileInfoService {
                 return resp;
             }
 
-            Date expiration = new Date(System.currentTimeMillis() + 8 * 60 * 1000);
+            Date expiration = new Date(System.currentTimeMillis() + 3 * 60 * 1000);
             URL url = ossClient.generatePresignedUrl(
                     bucket,
                     objectKey,
@@ -96,7 +153,11 @@ public class GetFileInfoServiceImpl implements GetFileInfoService {
             resp.put("type", file.getType());
             resp.put("error_message", "success");
         } catch (Exception e) {
-            resp.put("error_message", "OSS operation failed.");
+            switch (language) {
+                case LanguagesSelector.zh_CN: resp.put("error_message", "OSS操作失败"); break;
+                case LanguagesSelector.en_US:
+                default: resp.put("error_message", "OSS operation failed.");
+            }
             return resp;
         } finally {
             ossClient.shutdown();

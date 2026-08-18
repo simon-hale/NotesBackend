@@ -49,6 +49,18 @@ public class UpdatePasswordImpl implements UpdatePassword {
             return resp;
         }
 
+        if (password.length() > 100 || confirmedPassword.length() > 100) {
+            switch (language) {
+                case LanguagesSelector.zh_CN:
+                    resp.put("error_message", "密码长度不能超过100个字符。");
+                    break;
+                case LanguagesSelector.en_US:
+                default:
+                    resp.put("error_message", "Password cannot exceed 100 characters.");
+            }
+            return resp;
+        }
+
         if(!Objects.equals(password, confirmedPassword)){
             switch (language) {
                 case LanguagesSelector.zh_CN: resp.put("error_message", "两次密码不一致"); break;
@@ -79,8 +91,18 @@ public class UpdatePasswordImpl implements UpdatePassword {
         String encodedPassword = passwordEncoder.encode(password);
         UpdateWrapper<User> updateWrapper = new UpdateWrapper<>();
         updateWrapper.eq("id", userId).set("password", encodedPassword);
-        int result = userMapper.update(updateWrapper);
-        if(result > 0){
+        int result;
+        try {
+            result = userMapper.update(updateWrapper);
+        } catch (Exception e) {
+            switch (language) {
+                case LanguagesSelector.zh_CN: resp.put("error_message", "数据库更新出错"); break;
+                case LanguagesSelector.en_US:
+                default: resp.put("error_message", "Database update error.");
+            }
+            return resp;
+        }
+        if(result == 1){
             resp.put("error_message", "success");
         }else {
             switch (language) {

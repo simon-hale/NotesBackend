@@ -12,6 +12,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Objects;
 
 @Service
@@ -38,9 +40,56 @@ public class DeleteFileInfoServiceImpl implements DeleteFileInfoService {
     private AccessTokenExtractor accessTokenExtractor;
 
     @Override
-    public JSONObject deleteFileById(Integer id, String language) {
+    public JSONObject deleteFileById(String idString, String language) {
         JSONObject resp = new JSONObject();
-        File file = fileMapper.selectById(id);
+        if (idString == null || idString.isBlank()) {
+            switch (language) {
+                case LanguagesSelector.zh_CN:
+                    resp.put("error_message", "文件 ID 不能为空。");
+                    break;
+                case LanguagesSelector.en_US:
+                default:
+                    resp.put(
+                            "error_message",
+                            "The file ID cannot be empty."
+                    );
+            }
+            return resp;
+        }
+        Integer id;
+        try {
+            id = Integer.valueOf(idString.trim());
+        } catch (NumberFormatException e) {
+            switch (language) {
+                case LanguagesSelector.zh_CN:
+                    resp.put("error_message", "文件 ID 格式不正确。");
+                    break;
+                case LanguagesSelector.en_US:
+                default:
+                    resp.put(
+                            "error_message",
+                            "The file ID is invalid."
+                    );
+            }
+            return resp;
+        }
+        File file;
+        try {
+            file = fileMapper.selectById(id);
+        } catch (Exception e) {
+            switch (language) {
+                case LanguagesSelector.zh_CN:
+                    resp.put("error_message", "目标文件查询出错。");
+                    break;
+                case LanguagesSelector.en_US:
+                default:
+                    resp.put(
+                            "error_message",
+                            "Error querying the target file."
+                    );
+            }
+            return resp;
+        }
         if (file == null) {
             switch (language) {
                 case LanguagesSelector.zh_CN: resp.put("error_message", "文件不存在"); break;
@@ -64,27 +113,39 @@ public class DeleteFileInfoServiceImpl implements DeleteFileInfoService {
         try {
             deleted = fileMapper.deleteById(id);
         } catch (Exception e) {
-            resp.put("error_message", "SQL error.");
+            switch (language) {
+                case LanguagesSelector.zh_CN: resp.put("error_message", "数据库操作出错"); break;
+                case LanguagesSelector.en_US:
+                default: resp.put("error_message", "Database operation error.");
+            }
             return resp;
         }
 
         if (deleted != 1) {
-            resp.put("error_message", "SQL delete error.");
+            switch (language) {
+                case LanguagesSelector.zh_CN: resp.put("error_message", "数据库删除返回值非1"); break;
+                case LanguagesSelector.en_US:
+                default: resp.put("error_message", "Database deletion returned a non-1 value.");
+            }
             return resp;
         }
 
         String objectKey = "user/" + file.getUserId() + "/" + file.getStringOfPath() + file.getName();
 
-        OSS ossClient = new OSSClientBuilder()
-                .build("https://" + ossRegion + domain, accessKeyId, accessKeySecret);
-
+        OSS ossClient = null;
         try {
+            ossClient = new OSSClientBuilder()
+                    .build("https://" + ossRegion + domain, accessKeyId, accessKeySecret);
             ossClient.deleteObject(bucket, objectKey);
             resp.put("error_message", "success");
         } catch (Exception e) {
-            resp.put("error_message", "Database deleted, but OSS cleanup failed.");
+            switch (language) {
+                case LanguagesSelector.zh_CN: resp.put("error_message", "数据库记录已删除，但OSS中旧文件清理失败"); break;
+                case LanguagesSelector.en_US:
+                default: resp.put("error_message", "Database deleted, but OSS cleanup failed.");
+            }
         } finally {
-            ossClient.shutdown();
+            if (ossClient != null) ossClient.shutdown();
         }
 
         return resp;

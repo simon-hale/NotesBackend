@@ -17,7 +17,7 @@ public class InsertFileInfoController {
 
     @PostMapping("/api/file/insert/")
     JSONObject insertFileInfo(@RequestParam Map<String, String> data) {
-        return insertFileInfoService.insertFileInfo(data.get("string_of_path"), data.get("filename"), Integer.valueOf(data.get("parent_id")), data.get("language") == null ? LanguagesSelector.en_US : data.get("language"));
+        return insertFileInfoService.insertFileInfo(data.get("string_of_path"), data.get("filename"), data.get("parent_id"), data.get("language") == null ? LanguagesSelector.en_US : data.get("language"));
     }
 
 }

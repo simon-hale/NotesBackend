@@ -3,7 +3,9 @@ package org.projects.backend.service.impl.file;
 import com.alibaba.fastjson2.JSONObject;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
+import org.projects.backend.mapper.DirectoryMapper;
 import org.projects.backend.mapper.FileMapper;
+import org.projects.backend.pojo.Directory;
 import org.projects.backend.pojo.File;
 import org.projects.backend.service.file.InsertFileInfoService;
 import org.projects.backend.utils.AccessTokenExtractor;
@@ -13,7 +15,10 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -24,6 +29,9 @@ import com.aliyun.oss.OSSClientBuilder;
 public class InsertFileInfoServiceImpl implements InsertFileInfoService {
     @Autowired
     private FileMapper fileMapper;
+
+    @Autowired
+    private DirectoryMapper directoryMapper;
 
     @Value("${aliyun.oss.bucket}")
     private String bucket;
@@ -44,18 +52,22 @@ public class InsertFileInfoServiceImpl implements InsertFileInfoService {
     private AccessTokenExtractor accessTokenExtractor;
 
     @Override
-    public JSONObject insertFileInfo(String stringOfPath, String fileName, Integer parentId, String language){
+    public JSONObject insertFileInfo(String stringOfPath, String fileName, String parentDirectoryId, String language){
         JSONObject resp = new JSONObject();
 
-        if (fileName == null || fileName.isEmpty()) {
+        if (stringOfPath == null || fileName == null || stringOfPath.isBlank() || fileName.isBlank()) {
             switch (language) {
-                case LanguagesSelector.zh_CN: resp.put("error_message", "文件名不能为空"); break;
+                case LanguagesSelector.zh_CN:
+                    resp.put("error_message", "文件名和路径均不能为空");
+                    break;
                 case LanguagesSelector.en_US:
-                default: resp.put("error_message", "Filename is null or empty.");
+                default:
+                    resp.put("error_message", "The file name and path cannot be empty.");
             }
             return resp;
         }
-
+        stringOfPath = stringOfPath.trim();
+        fileName = fileName.trim();
         if (fileName.length() > 100) {
             switch (language) {
                 case LanguagesSelector.zh_CN: resp.put("error_message", "文件名长度不能大于100个字符"); break;
@@ -76,14 +88,132 @@ public class InsertFileInfoServiceImpl implements InsertFileInfoService {
 
         Integer userId = accessTokenExtractor.getCurrentUserId();
 
+        if (parentDirectoryId == null || parentDirectoryId.isBlank()) {
+            switch (language) {
+                case LanguagesSelector.zh_CN:
+                    resp.put("error_message", "父目录 ID 不能为空。");
+                    break;
+                case LanguagesSelector.en_US:
+                default:
+                    resp.put(
+                            "error_message",
+                            "The parent directory ID cannot be empty."
+                    );
+            }
+            return resp;
+        }
+        Integer parentId;
+        try {
+            parentId = Integer.valueOf(parentDirectoryId.trim());
+        } catch (NumberFormatException e) {
+            switch (language) {
+                case LanguagesSelector.zh_CN:
+                    resp.put("error_message", "父目录 ID 格式不正确。");
+                    break;
+                case LanguagesSelector.en_US:
+                default:
+                    resp.put(
+                            "error_message",
+                            "The parent directory ID is invalid."
+                    );
+            }
+            return resp;
+        }
+        Directory directory;
+        try {
+            directory = directoryMapper.selectById(parentId);
+        } catch (Exception e) {
+            switch (language) {
+                case LanguagesSelector.zh_CN:
+                    resp.put("error_message", "父目录查询出错。");
+                    break;
+                case LanguagesSelector.en_US:
+                default:
+                    resp.put(
+                            "error_message",
+                            "Error querying the parent directory."
+                    );
+            }
+            return resp;
+        }
+        if (directory == null) {
+            switch (language) {
+                case LanguagesSelector.zh_CN:
+                    resp.put("error_message", "父目录不存在");
+                    break;
+                case LanguagesSelector.en_US:
+                default:
+                    resp.put(
+                            "error_message",
+                            "Parent directory does not exist."
+                    );
+            }
+            return resp;
+        }
+        if (!Objects.equals(directory.getUserId(), userId)) {
+            switch (language) {
+                case LanguagesSelector.zh_CN:
+                    resp.put("error_message", "未授权的操作");
+                    break;
+                case LanguagesSelector.en_US:
+                default:
+                    resp.put(
+                            "error_message",
+                            "Unauthorized operation."
+                    );
+            }
+            return resp;
+        }
+
+        // 路径必须由目录ID和“/”组成，例如：1/5/12/
+        if (!stringOfPath.matches("\\d+(?:/\\d+)*/")) {
+            switch (language) {
+                case LanguagesSelector.zh_CN: resp.put("error_message", "文件路径格式不正确"); break;
+                case LanguagesSelector.en_US:
+                default: resp.put("error_message", "The file path format is invalid."
+                );
+            }
+            return resp;
+        }
+
+        String[] pathParts = stringOfPath.split("/");
+        String lastDirectoryId = pathParts[pathParts.length - 1];
+
+        if (!lastDirectoryId.equals(directory.getId().toString())) {
+            switch (language) {
+                case LanguagesSelector.zh_CN: resp.put("error_message", "文件路径与父目录不匹配"); break;
+                case LanguagesSelector.en_US:
+                default:
+                    resp.put("error_message", "The file path does not match the parent directory.");
+            }
+            return resp;
+        }
+
         String objectKey = "user/" + userId + "/" + stringOfPath + fileName;
 
-        OSS ossClient = new OSSClientBuilder()
-                .build("https://" + ossRegion + domain, accessKeyId, accessKeySecret);
+        OSS ossClient;
+        try {
+            ossClient = new OSSClientBuilder()
+                    .build("https://" + ossRegion + domain, accessKeyId, accessKeySecret);
+        } catch (Exception e) {
+            switch (language) {
+                case LanguagesSelector.zh_CN: resp.put("error_message", "OSS客户端创建失败"); break;
+                case LanguagesSelector.en_US:
+                default: resp.put("error_message", "Error building OSS client.");
+            }
+            return resp;
+        }
 
         boolean exists;
         try {
             exists = ossClient.doesObjectExist(bucket, objectKey);
+        } catch (Exception e) {
+            switch (language) {
+                case LanguagesSelector.zh_CN: resp.put("error_message", "OSS客户端请求失败"); break;
+                case LanguagesSelector.en_US:
+                default: resp.put("error_message", "Error requesting OSS client.");
+            }
+            return resp;
         } finally {
             ossClient.shutdown();
         }
@@ -92,21 +222,31 @@ public class InsertFileInfoServiceImpl implements InsertFileInfoService {
             switch (language) {
                 case LanguagesSelector.zh_CN: resp.put("error_message", "文件不存在"); break;
                 case LanguagesSelector.en_US:
-                default: resp.put("error_message", "File Not Exists.");
+                default: resp.put("error_message", "File does not exist.");
             }
             return resp;
         }
 
-        List<File> curFileList = fileMapper.selectList(new QueryWrapper<File>()
-                .eq("user_id", userId)
-                .eq("parent_id", parentId)
-                .eq("name", fileName));
+        List<File> curFileList;
+        try {
+            curFileList = fileMapper.selectList(new QueryWrapper<File>()
+                    .eq("user_id", userId)
+                    .eq("parent_id", parentId)
+                    .eq("name", fileName));
+        } catch (Exception e) {
+            switch (language) {
+                case LanguagesSelector.zh_CN: resp.put("error_message", "现有文件查询错误"); break;
+                case LanguagesSelector.en_US:
+                default: resp.put("error_message", "Error querying existing files.");
+            }
+            return resp;
+        }
         if (!curFileList.isEmpty()){
             if(curFileList.size()>1){
                 switch (language) {
                     case LanguagesSelector.zh_CN: resp.put("error_message", "存在多个同名文件"); break;
                     case LanguagesSelector.en_US:
-                    default: resp.put("error_message", "Same files more than once.");
+                    default: resp.put("error_message", "Multiple files with the same name exist.");
                 }
             }else{
                 try {
@@ -116,9 +256,17 @@ public class InsertFileInfoServiceImpl implements InsertFileInfoService {
                                     .eq("id", curFileList.getFirst().getId())
                                     .set("last_modified_time", LocalDateTime.now())
                     );
-                    resp.put("error_message", updated == 1 ? "success" : "SQL update error.");
+                    resp.put("error_message", updated == 1 ? "success" : switch (language) {
+                        case LanguagesSelector.zh_CN -> "数据库更新错误";
+                        case LanguagesSelector.en_US -> "SQL update error.";
+                        default -> "SQL update error.";
+                    });
                 } catch (Exception e) {
-                    resp.put("error_message", "SQL error.");
+                    switch (language) {
+                        case LanguagesSelector.zh_CN: resp.put("error_message", "数据库更新出错"); break;
+                        case LanguagesSelector.en_US:
+                        default: resp.put("error_message", "SQL update error.");
+                    }
                 }
             }
             return resp;
@@ -139,16 +287,27 @@ public class InsertFileInfoServiceImpl implements InsertFileInfoService {
         String type = matcher.find() ? matcher.group(1) : "null";
         file.setType(type);
 
+        int inserted;
         try {
-            int inserted = fileMapper.insert(file);
-
-            resp.put(
-                    "error_message",
-                    inserted == 1 ? "success" : "SQL insert error."
-            );
+            inserted = fileMapper.insert(file);
         } catch (Exception e) {
-            resp.put("error_message", "SQL error.");
+            switch (language) {
+                case LanguagesSelector.zh_CN: resp.put("error_message", "数据库操作出错"); break;
+                case LanguagesSelector.en_US:
+                default: resp.put("error_message", "Database operation error.");
+            }
+            return resp;
         }
+
+        resp.put(
+                "error_message",
+                inserted == 1 ? "success" :
+                        switch (language) {
+                            case LanguagesSelector.zh_CN -> "数据库插入返回值非1";
+                            case LanguagesSelector.en_US -> "Database insertion returned a non-1 value.";
+                            default -> "Database insertion returned a non-1 value.";
+                        }
+        );
 
         return resp;
     }

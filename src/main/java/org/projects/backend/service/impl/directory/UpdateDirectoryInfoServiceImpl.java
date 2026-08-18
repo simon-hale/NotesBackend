@@ -23,9 +23,9 @@ public class UpdateDirectoryInfoServiceImpl implements UpdateDirectoryInfoServic
     private AccessTokenExtractor accessTokenExtractor;
 
     @Override
-    public JSONObject modifyDirectoryNameById(Integer id, String name, String language) {
+    public JSONObject modifyDirectoryNameById(String idString, String name, String language) {
         JSONObject resp = new JSONObject();
-        if (name == null || name.isEmpty()) {
+        if (name == null || name.isBlank()) {
             switch (language) {
                 case LanguagesSelector.zh_CN: resp.put("error_message", "目录名不能为空"); break;
                 case LanguagesSelector.en_US:
@@ -33,6 +33,7 @@ public class UpdateDirectoryInfoServiceImpl implements UpdateDirectoryInfoServic
             }
             return resp;
         }
+        name = name.trim();
         if (name.length() > 100) {
             switch (language) {
                 case LanguagesSelector.zh_CN: resp.put("error_message", "目录名长度不能大于100个字符"); break;
@@ -49,12 +50,59 @@ public class UpdateDirectoryInfoServiceImpl implements UpdateDirectoryInfoServic
             }
             return resp;
         }
-        Directory directory = directoryMapper.selectById(id);
+        if (idString == null || idString.isBlank()) {
+            switch (language) {
+                case LanguagesSelector.zh_CN:
+                    resp.put("error_message", "目录 ID 不能为空。");
+                    break;
+                case LanguagesSelector.en_US:
+                default:
+                    resp.put(
+                            "error_message",
+                            "The directory ID cannot be empty."
+                    );
+            }
+            return resp;
+        }
+        Integer id;
+        try {
+            id = Integer.valueOf(idString.trim());
+        } catch (NumberFormatException e) {
+            switch (language) {
+                case LanguagesSelector.zh_CN:
+                    resp.put("error_message", "目录 ID 格式不正确。");
+                    break;
+                case LanguagesSelector.en_US:
+                default:
+                    resp.put(
+                            "error_message",
+                            "The directory ID is invalid."
+                    );
+            }
+            return resp;
+        }
+        Directory directory;
+        try {
+            directory = directoryMapper.selectById(id);
+        } catch (Exception e) {
+            switch (language) {
+                case LanguagesSelector.zh_CN:
+                    resp.put("error_message", "目标目录查询出错。");
+                    break;
+                case LanguagesSelector.en_US:
+                default:
+                    resp.put(
+                            "error_message",
+                            "Error querying the target directory."
+                    );
+            }
+            return resp;
+        }
         if (directory == null) {
             switch (language) {
                 case LanguagesSelector.zh_CN: resp.put("error_message", "目标目录不存在"); break;
                 case LanguagesSelector.en_US:
-                default: resp.put("error_message", "Directory does not exist.");
+                default: resp.put("error_message", "Target directory does not exist.");
             }
             return resp;
         }
@@ -81,20 +129,33 @@ public class UpdateDirectoryInfoServiceImpl implements UpdateDirectoryInfoServic
             return resp;
         }
         int parentId = directory.getParentId();
-        Long countOld = directoryMapper.selectCount(new QueryWrapper<Directory>()
-                .eq("parent_id", parentId)
-                .eq("name", oldName));
+        Long countOld;
+        Long countNew;
+        try {
+            countOld = directoryMapper.selectCount(new QueryWrapper<Directory>()
+                    .eq("parent_id", parentId)
+                    .eq("name", oldName)
+                    .eq("user_id", userId));
+            countNew = directoryMapper.selectCount(new QueryWrapper<Directory>()
+                    .eq("parent_id", parentId)
+                    .eq("name", name)
+                    .eq("user_id", userId));
+        } catch (Exception e) {
+            switch (language) {
+                case LanguagesSelector.zh_CN: resp.put("error_message", "目录数量查询出错"); break;
+                case LanguagesSelector.en_US:
+                default: resp.put("error_message", "Error querying directory count.");
+            }
+            return resp;
+        }
         if (countOld != 1) {
             switch (language) {
                 case LanguagesSelector.zh_CN: resp.put("error_message", "旧目录数量不为1"); break;
                 case LanguagesSelector.en_US:
-                default: resp.put("error_message", "The number of old directory is not one.");
+                default: resp.put("error_message", "The number of old directories is not one.");
             }
             return resp;
         }
-        Long countNew = directoryMapper.selectCount(new QueryWrapper<Directory>()
-                .eq("parent_id", parentId)
-                .eq("name", name));
         if (countNew != 0) {
             switch (language) {
                 case LanguagesSelector.zh_CN: resp.put("error_message", "该目录名在当前目录中已存在"); break;
@@ -103,17 +164,32 @@ public class UpdateDirectoryInfoServiceImpl implements UpdateDirectoryInfoServic
             }
             return resp;
         }
-        int modifySuccess = directoryMapper.update(
-                null,
-                new UpdateWrapper<Directory>()
-                        .eq("id", id)
-                        .set("name", name)
-        );
-        if(modifySuccess == 1){
-            resp.put("error_message", "success");
-        }else{
-            resp.put("error_message", "SQL error.");
+        int modifySuccess;
+        try {
+            modifySuccess = directoryMapper.update(
+                    null,
+                    new UpdateWrapper<Directory>()
+                            .eq("id", id)
+                            .eq("user_id", userId)
+                            .set("name", name)
+            );
+        } catch (Exception e) {
+            switch (language) {
+                case LanguagesSelector.zh_CN: resp.put("error_message", "数据库操作错误"); break;
+                case LanguagesSelector.en_US:
+                default: resp.put("error_message", "Database operation error.");
+            }
+            return resp;
         }
+
+        resp.put(
+                "error_message",
+                modifySuccess == 1 ? "success" : switch (language) {
+                    case LanguagesSelector.zh_CN -> "数据库更新返回值非1";
+                    case LanguagesSelector.en_US -> "Database update returned a non-1 value.";
+                    default -> "Database update returned a non-1 value.";
+                }
+        );
         return resp;
     }
 }

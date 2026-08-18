@@ -13,7 +13,7 @@ import org.projects.backend.utils.LanguagesSelector;
 import org.projects.backend.utils.StsUsageSelector;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -45,8 +45,8 @@ public class OssStsController {
     @Autowired
     private AccessTokenExtractor accessTokenExtractor;
 
-    @GetMapping("/sts/")
-    public Map<String, Object> getStsToken(@RequestParam Map<String, String> data) throws Exception {
+    @PostMapping("/sts/")
+    public Map<String, Object> getStsToken(@RequestParam Map<String, String> data) {
         String language = data.get("language") == null ? LanguagesSelector.en_US : data.get("language");
         // ① 校验用户身份
         Integer userId = accessTokenExtractor.getCurrentUserId();
@@ -65,15 +65,17 @@ public class OssStsController {
             }
             return rejectResult;
         }
+        stringOfPath = stringOfPath.trim();
+        fileName = fileName.trim();
         if (stringOfPath.length() > 1000) {
             Map<String, Object> rejectResultPath = new HashMap<>();
             switch (language) {
                 case LanguagesSelector.zh_CN:
-                    rejectResultPath.put("error_message", "路径长度不能超过1000个字符。");
+                    rejectResultPath.put("error_message", "文件绝对路径长度不能大于1000个字符");
                     break;
                 case LanguagesSelector.en_US:
                 default:
-                    rejectResultPath.put("error_message", "Path cannot exceed 1000 characters.");
+                    rejectResultPath.put("error_message", "Path string max 1000 chars.");
             }
             return rejectResultPath;
         }
@@ -161,18 +163,35 @@ public class OssStsController {
             }
             return rejectResult;
         }
-        Directory directory = directoryMapper.selectById(parentDirectoryId);
-        if (directory == null) {
+        Directory directory;
+        try {
+            directory = directoryMapper.selectById(parentDirectoryId);
+        } catch (Exception e) {
             Map<String, Object> rejectResult = new HashMap<>();
             switch (language) {
                 case LanguagesSelector.zh_CN:
-                    rejectResult.put("error_message", "父目录查询失败");
+                    rejectResult.put("error_message", "父目录查询出错。");
                     break;
                 case LanguagesSelector.en_US:
                 default:
                     rejectResult.put(
                             "error_message",
-                            "Error querying parent directory."
+                            "Error querying the parent directory."
+                    );
+            }
+            return rejectResult;
+        }
+        if (directory == null) {
+            Map<String, Object> rejectResult = new HashMap<>();
+            switch (language) {
+                case LanguagesSelector.zh_CN:
+                    rejectResult.put("error_message", "父目录不存在");
+                    break;
+                case LanguagesSelector.en_US:
+                default:
+                    rejectResult.put(
+                            "error_message",
+                            "Parent directory does not exist."
                     );
             }
             return rejectResult;
@@ -198,7 +217,7 @@ public class OssStsController {
 
             switch (language) {
                 case LanguagesSelector.zh_CN:
-                    rejectResult.put("error_message", "文件路径格式不正确。");
+                    rejectResult.put("error_message", "文件路径格式不正确");
                     break;
                 case LanguagesSelector.en_US:
                 default:
@@ -219,7 +238,7 @@ public class OssStsController {
 
             switch (language) {
                 case LanguagesSelector.zh_CN:
-                    rejectResult.put("error_message", "文件路径与父目录不匹配。");
+                    rejectResult.put("error_message", "文件路径与父目录不匹配");
                     break;
                 case LanguagesSelector.en_US:
                 default:
@@ -230,6 +249,32 @@ public class OssStsController {
             }
 
             return rejectResult;
+        }
+
+        Map<String, Object> result = new HashMap<>();
+        List<File> sameFileList;
+        try {
+            sameFileList = fileMapper.selectList(new QueryWrapper<File>()
+                    .eq("user_id", userId)
+                    .eq("parent_id", parentDirectoryId)
+                    .eq("name", fileName));
+            if (sameFileList.size() > 1) {
+                switch (language) {
+                    case LanguagesSelector.zh_CN: result.put("error_message", "存在多个同名文件"); break;
+                    case LanguagesSelector.en_US:
+                    default:
+                        result.put("error_message", "Multiple files with the same name exist.");
+                }
+                return result;
+            } else if (sameFileList.size() == 1) result.put("error_message", "same_file_name");
+            else result.put("error_message", "success");
+        } catch (Exception e) {
+            switch (language) {
+                case LanguagesSelector.zh_CN: result.put("error_message", "目标文件存在性查询失败，未作任何修改"); break;
+                case LanguagesSelector.en_US:
+                default: result.put("error_message", "The existence query for the target file failed, with no changes made.");
+            }
+            return result;
         }
 
         // ② 校验STS用途、分配权限
@@ -245,11 +290,11 @@ public class OssStsController {
             Map<String, Object> errorResultActions = new HashMap<>();
             switch (language) {
                 case LanguagesSelector.zh_CN:
-                    errorResultActions.put("error_message", "不支持的请求");
+                    errorResultActions.put("error_message", "不支持的用途");
                     break;
                 case LanguagesSelector.en_US:
                 default:
-                    errorResultActions.put("error_message", "unsupported usage");
+                    errorResultActions.put("error_message", "unsupported usage.");
             }
             return errorResultActions;
         }
@@ -268,26 +313,27 @@ public class OssStsController {
         policyMap.put("Version", "1");
         policyMap.put("Statement", List.of(statement));
 
-        String policy = new ObjectMapper().writeValueAsString(policyMap);
+        String policy;
+        AssumeRoleResponse.Credentials cred;
+        try {
+            policy = new ObjectMapper().writeValueAsString(policyMap);
+            cred = stService.assumeRole(policy);
+        } catch (Exception e) {
+            Map<String, Object> errorResult = new HashMap<>();
+            switch (language) {
+                case LanguagesSelector.zh_CN: errorResult.put("error_message", "STS凭证获取失败"); break;
+                case LanguagesSelector.en_US:
+                default: errorResult.put("error_message", "Failed to obtain STS credentials.");
+            }
+            return errorResult;
+        }
 
-        AssumeRoleResponse.Credentials cred = stService.assumeRole(policy);
-
-        Map<String, Object> result = new HashMap<>();
         result.put("accessKeyId", cred.getAccessKeyId());
         result.put("accessKeySecret", cred.getAccessKeySecret());
         result.put("securityToken", cred.getSecurityToken());
-//        result.put("expireAt", cred.getExpiration());
         result.put("bucket", bucket);
         result.put("region", ossRegion);
         result.put("objectKey", objectKey);
-
-        if (!fileMapper.selectList(new QueryWrapper<File>()
-                        .eq("user_id", userId)
-                        .eq("parent_id", parentDirectoryId)
-                        .eq("name", fileName))
-                .isEmpty()) result.put("error_message", "same_file_name");
-        else result.put("error_message", "success");
-
         return result;
     }
 }

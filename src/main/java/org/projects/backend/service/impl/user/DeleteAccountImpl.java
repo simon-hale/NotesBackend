@@ -73,25 +73,79 @@ public class DeleteAccountImpl implements DeleteAccount {
             }
             return resp;
         }
-        List<File> fileList = fileMapper.selectList(new QueryWrapper<File>().eq("user_id", user.getId()));
+        List<File> fileList;
+        try {
+            fileList = fileMapper.selectList(new QueryWrapper<File>().eq("user_id", user.getId()));
+        } catch (Exception e) {
+            switch (language) {
+                case LanguagesSelector.zh_CN: resp.put("error_message", "用户文件查询出错，删除操作已终止"); break;
+                case LanguagesSelector.en_US:
+                default: resp.put("error_message", "Error querying user files. The delete operation was aborted.");
+            }
+            return resp;
+        }
 
-        OSS ossClient = new OSSClientBuilder()
-                .build("https://" + ossRegion + domain, accessKeyId, accessKeySecret);
+        OSS ossClient;
+
+        try {
+            ossClient = new OSSClientBuilder()
+                    .build("https://" + ossRegion + domain, accessKeyId, accessKeySecret);
+        } catch (Exception e) {
+            switch (language) {
+                case LanguagesSelector.zh_CN: resp.put("error_message", "OSS客户端创建失败，删除操作已终止"); break;
+                case LanguagesSelector.en_US:
+                default: resp.put("error_message", "Error building OSS client. The delete operation was aborted.");
+            }
+            return resp;
+        }
 
         String objectKey;
         try {
             for(File file:fileList){
                 objectKey = "user/" + file.getUserId() + "/" + file.getStringOfPath() + file.getName();
                 ossClient.deleteObject(bucket, objectKey);
-                fileMapper.deleteById(file.getId());
+                int deletedFile = fileMapper.deleteById(file.getId());
+                if (deletedFile != 1) {
+                    switch (language) {
+                        case LanguagesSelector.zh_CN: resp.put("error_message", "数据库文件表项删除返回值非1，删除操作已终止，可能会有残留数据，请联系管理员"); break;
+                        case LanguagesSelector.en_US:
+                        default: resp.put("error_message", "Database file deletion returned a non-1 value. The delete operation was aborted. There may be residual data. Please contact the administrator.");
+                    }
+                    return resp;
+                }
             }
-            directoryMapper.delete(new QueryWrapper<Directory>().eq("user_id", user.getId()));
+            int deletedDirectories = directoryMapper.delete(new QueryWrapper<Directory>().eq("user_id", user.getId()));
+            if (deletedDirectories <= 0) {
+                switch (language) {
+                    case LanguagesSelector.zh_CN: resp.put("error_message", "数据库目录删除返回值异常，删除操作已终止，可能会有残留数据，请联系管理员");break;
+                    case LanguagesSelector.en_US:
+                    default: resp.put("error_message", "Database directory deletion returned an invalid value. The delete operation was aborted. There may be residual data. Please contact the administrator.");
+                }
+                return resp;
+            }
+        } catch (Exception e) {
+            switch (language) {
+                case LanguagesSelector.zh_CN: resp.put("error_message", "删除用户数据时出错，删除操作已终止，可能会有残留数据，请联系管理员"); break;
+                case LanguagesSelector.en_US:
+                default: resp.put("error_message", "Error deleting user data. The delete operation was aborted. There may be residual data. Please contact the administrator.");
+            }
+            return resp;
         } finally {
             ossClient.shutdown();
         }
 
-        int result = userMapper.deleteById(user.getId());
-        if(result > 0){
+        int result;
+        try {
+            result = userMapper.deleteById(user.getId());
+        } catch (Exception e) {
+            switch (language) {
+                case LanguagesSelector.zh_CN: resp.put("error_message", "数据库删除用户表项失败，但用户已无其他残留数据"); break;
+                case LanguagesSelector.en_US:
+                default: resp.put("error_message", "Failed to delete the user record from the database, but no other residual user data remains.");
+            }
+            return resp;
+        }
+        if(result == 1){
             resp.put("error_message", "success");
         }else {
             switch (language) {

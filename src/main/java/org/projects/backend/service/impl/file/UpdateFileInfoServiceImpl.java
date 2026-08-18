@@ -50,18 +50,21 @@ public class UpdateFileInfoServiceImpl implements UpdateFileInfoService {
     private AccessTokenExtractor accessTokenExtractor;
 
     @Override
-    public JSONObject modifyFileNameById(Integer parentId, Integer fileId, String filenameNew, String language){
+    public JSONObject modifyFileNameById(String parentDirectoryId, String fileIdString, String filenameNew, String language){
         JSONObject resp = new JSONObject();
 
-        if (filenameNew == null || filenameNew.isEmpty()) {
+        if (filenameNew == null || filenameNew.isBlank()) {
             switch (language) {
-                case LanguagesSelector.zh_CN: resp.put("error_message", "文件名不能为空"); break;
+                case LanguagesSelector.zh_CN:
+                    resp.put("error_message", "文件名不能为空");
+                    break;
                 case LanguagesSelector.en_US:
-                default: resp.put("error_message", "Filename is null or empty.");
+                default:
+                    resp.put("error_message", "The file name cannot be empty.");
             }
             return resp;
         }
-
+        filenameNew = filenameNew.trim();
         if (filenameNew.length() > 100) {
             switch (language) {
                 case LanguagesSelector.zh_CN: resp.put("error_message", "文件名长度不能大于100个字符"); break;
@@ -73,43 +76,166 @@ public class UpdateFileInfoServiceImpl implements UpdateFileInfoService {
 
         Integer userId = accessTokenExtractor.getCurrentUserId();
 
-        Directory directory = directoryMapper.selectById(parentId);
-        if (directory == null) {
+        if (parentDirectoryId == null || parentDirectoryId.isBlank()) {
             switch (language) {
-                case LanguagesSelector.zh_CN: resp.put("error_message", "目标目录不存在"); break;
+                case LanguagesSelector.zh_CN:
+                    resp.put("error_message", "父目录 ID 不能为空。");
+                    break;
                 case LanguagesSelector.en_US:
-                default: resp.put("error_message", "Directory Not Exists.");
+                default:
+                    resp.put(
+                            "error_message",
+                            "The parent directory ID cannot be empty."
+                    );
             }
             return resp;
-        } else if (!Objects.equals(userId, directory.getUserId())) {
+        }
+        Integer parentId;
+        try {
+            parentId = Integer.valueOf(parentDirectoryId.trim());
+        } catch (NumberFormatException e) {
             switch (language) {
-                case LanguagesSelector.zh_CN: resp.put("error_message", "未授权的操作"); break;
+                case LanguagesSelector.zh_CN:
+                    resp.put("error_message", "父目录 ID 格式不正确。");
+                    break;
                 case LanguagesSelector.en_US:
-                default: resp.put("error_message", "Unauthorized operation.");
+                default:
+                    resp.put(
+                            "error_message",
+                            "The parent directory ID is invalid."
+                    );
+            }
+            return resp;
+        }
+        Directory directory;
+        try {
+            directory = directoryMapper.selectById(parentId);
+        } catch (Exception e) {
+            switch (language) {
+                case LanguagesSelector.zh_CN:
+                    resp.put("error_message", "父目录查询出错。");
+                    break;
+                case LanguagesSelector.en_US:
+                default:
+                    resp.put(
+                            "error_message",
+                            "Error querying the parent directory."
+                    );
+            }
+            return resp;
+        }
+        if (directory == null) {
+            switch (language) {
+                case LanguagesSelector.zh_CN:
+                    resp.put("error_message", "父目录不存在");
+                    break;
+                case LanguagesSelector.en_US:
+                default:
+                    resp.put(
+                            "error_message",
+                            "Parent directory does not exist."
+                    );
+            }
+            return resp;
+        }
+        if (!Objects.equals(directory.getUserId(), userId)) {
+            switch (language) {
+                case LanguagesSelector.zh_CN:
+                    resp.put("error_message", "未授权的操作");
+                    break;
+                case LanguagesSelector.en_US:
+                default:
+                    resp.put(
+                            "error_message",
+                            "Unauthorized operation."
+                    );
             }
             return resp;
         }
 
-        File fileTarget = fileMapper.selectById(fileId);
+        if (fileIdString == null || fileIdString.isBlank()) {
+            switch (language) {
+                case LanguagesSelector.zh_CN:
+                    resp.put("error_message", "文件 ID 不能为空。");
+                    break;
+                case LanguagesSelector.en_US:
+                default:
+                    resp.put(
+                            "error_message",
+                            "The file ID cannot be empty."
+                    );
+            }
+            return resp;
+        }
+        Integer fileId;
+        try {
+            fileId = Integer.valueOf(fileIdString.trim());
+        } catch (NumberFormatException e) {
+            switch (language) {
+                case LanguagesSelector.zh_CN:
+                    resp.put("error_message", "文件 ID 格式不正确。");
+                    break;
+                case LanguagesSelector.en_US:
+                default:
+                    resp.put(
+                            "error_message",
+                            "The file ID is invalid."
+                    );
+            }
+            return resp;
+        }
+        File fileTarget;
+        try {
+            fileTarget = fileMapper.selectById(fileId);
+        } catch (Exception e) {
+            switch (language) {
+                case LanguagesSelector.zh_CN: resp.put("error_message", "目标文件查询出错"); break;
+                case LanguagesSelector.en_US:
+                default: resp.put("error_message", "Error querying target file.");
+            }
+            return resp;
+        }
         if (fileTarget == null) {
             switch (language) {
-                case LanguagesSelector.zh_CN: resp.put("error_message", "文件不存在"); break;
+                case LanguagesSelector.zh_CN:
+                    resp.put("error_message", "目标文件查询结果为空");
+                    break;
                 case LanguagesSelector.en_US:
-                default: resp.put("error_message", "File Not Exists.");
+                default:
+                    resp.put(
+                            "error_message",
+                            "No results found for the target file."
+                    );
             }
             return resp;
         }
         if (!Objects.equals(fileTarget.getParentId(), directory.getId())
                 || !Objects.equals(fileTarget.getUserId(), userId)) {
             switch (language) {
-                case LanguagesSelector.zh_CN: resp.put("error_message", "文件父目录ID与目录或用户不匹配"); break;
+                case LanguagesSelector.zh_CN:
+                    resp.put("error_message", "未授权的操作");
+                    break;
                 case LanguagesSelector.en_US:
-                default: resp.put("error_message", "File Parent Id Mismatch With Directory Or User.");
+                default:
+                    resp.put(
+                            "error_message",
+                            "Unauthorized operation."
+                    );
             }
             return resp;
         }
 
-        List<File> filesNewCheck = fileMapper.selectList(new QueryWrapper<File>().eq("name", filenameNew).eq("parent_id", parentId).eq("user_id", userId));
+        List<File> filesNewCheck;
+        try {
+            filesNewCheck = fileMapper.selectList(new QueryWrapper<File>().eq("name", filenameNew).eq("parent_id", parentId).eq("user_id", userId));
+        } catch (Exception e) {
+            switch (language) {
+                case LanguagesSelector.zh_CN: resp.put("error_message", "目标文件检查列表查询出错"); break;
+                case LanguagesSelector.en_US:
+                default: resp.put("error_message", "Error in target file check list query.");
+            }
+            return resp;
+        }
         if (!filesNewCheck.isEmpty()) {
             if (filesNewCheck.size() > 1) {
                 switch (language) {
@@ -132,8 +258,18 @@ public class UpdateFileInfoServiceImpl implements UpdateFileInfoService {
         String objectKeyOld = "user/" + fileTarget.getUserId() + "/" + fileTarget.getStringOfPath() + fileTarget.getName();
         String objectKeyNew = "user/" + fileTarget.getUserId() + "/" + fileTarget.getStringOfPath() + filenameNew;
 
-        OSS ossClient = new OSSClientBuilder()
-                .build("https://" + ossRegion + domain, accessKeyId, accessKeySecret);
+        OSS ossClient;
+        try {
+            ossClient = new OSSClientBuilder()
+                    .build("https://" + ossRegion + domain, accessKeyId, accessKeySecret);
+        } catch (Exception e) {
+            switch (language) {
+                case LanguagesSelector.zh_CN: resp.put("error_message", "OSS客户端创建失败"); break;
+                case LanguagesSelector.en_US:
+                default: resp.put("error_message", "Error building OSS client.");
+            }
+            return resp;
+        }
 
         try {
             if (!ossClient.doesObjectExist(bucket, objectKeyOld)) {

@@ -17,6 +17,6 @@ public class UpdateFileInfoController {
 
     @PostMapping("/api/file/modify/name/")
     JSONObject modifyFileNameById(@RequestParam Map<String, String> data) {
-        return updateFileInfoService.modifyFileNameById(Integer.parseInt(data.get("parentId")), Integer.parseInt(data.get("fileId")), data.get("filenameNew"), data.get("language") == null ? LanguagesSelector.en_US : data.get("language"));
+        return updateFileInfoService.modifyFileNameById(data.get("parentId"), data.get("fileId"), data.get("filenameNew"), data.get("language") == null ? LanguagesSelector.en_US : data.get("language"));
     }
 }
