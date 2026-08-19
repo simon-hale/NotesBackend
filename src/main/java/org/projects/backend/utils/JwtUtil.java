@@ -3,7 +3,6 @@ package org.projects.backend.utils;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtBuilder;
 import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.SignatureAlgorithm;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -13,8 +12,9 @@ import java.util.Base64;
 import java.util.Date;
 import java.util.UUID;
 
-//    本类的作用是生成jwt令牌并实现解析userid
-//    本类不实现令牌验证
+//    本类负责生成 JWT 令牌并解析 JWT Claims
+//    本类负责 JWT 的生成、解析及签名/有效期验证
+//    具体异常由上层认证过滤器处理
 //    原理是将一个字符串加上一个密钥再加上有效期，变成一个加密之后的字符串
 
 @Component
@@ -43,8 +43,6 @@ public class JwtUtil {
     }
 //    用于构建令牌的具体实现过程
     private static JwtBuilder getJwtBuilder(String subject, Long ttlMillis, String uuid) {
-//        设置签名算法
-        SignatureAlgorithm signatureAlgorithm = SignatureAlgorithm.HS256;
         SecretKey secretKey = generalKey();  // 对密钥处理，得到一个可以用于签名的密钥
 //        处理并获取时间信息，用于生成令牌
         long nowMillis = System.currentTimeMillis();
@@ -57,12 +55,12 @@ public class JwtUtil {
         long expMillis = nowMillis + ttlMillis;
         Date expDate = new Date(expMillis);
         return Jwts.builder()
-                .setId(uuid)
-                .setSubject(subject)
-                .setIssuer("sg")
-                .setIssuedAt(now)
-                .signWith(signatureAlgorithm, secretKey)
-                .setExpiration(expDate);
+                .id(uuid)
+                .subject(subject)
+                .issuer("sg")
+                .issuedAt(now)
+                .expiration(expDate)
+                .signWith(secretKey, Jwts.SIG.HS256);
     }
 
 //    对密钥JWT_KEY进行处理
@@ -72,13 +70,13 @@ public class JwtUtil {
     }
 
 //    根据令牌解析userid
-    public static Claims parseJWT(String jwt) throws Exception {
+    public static Claims parseJWT(String jwt) {
         SecretKey secretKey = generalKey();
-        return Jwts.parserBuilder()
-                .setSigningKey(secretKey)
+        return Jwts.parser()
+                .verifyWith(secretKey)
                 .build()
-                .parseClaimsJws(jwt)
-                .getBody();
+                .parseSignedClaims(jwt)
+                .getPayload();
     }
 }
 
