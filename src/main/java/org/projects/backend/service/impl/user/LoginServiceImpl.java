@@ -1,9 +1,11 @@
 package org.projects.backend.service.impl.user;
 
+import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import org.projects.backend.mapper.UserMapper;
 import org.projects.backend.pojo.User;
 import org.projects.backend.service.impl.UserDetailsImpl;
 import org.projects.backend.service.user.LoginService;
+import org.projects.backend.utils.AccessTokenExtractor;
 import org.projects.backend.utils.JwtUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -26,6 +28,9 @@ public class LoginServiceImpl implements LoginService {
     @Autowired
     private UserMapper userMapper;
 
+    @Autowired
+    private AccessTokenExtractor accessTokenExtractor;
+
     @Override
     public Map<String, String> getToken(String username, String password) {
 //        前四行直接记,用于实现jwt之下的密码登录过程,  可以理解为对数据处理
@@ -39,7 +44,7 @@ public class LoginServiceImpl implements LoginService {
 //        提取信息
         User user = loginUser.getUser();
 
-        String jwt = JwtUtil.createJWT(user.getId().toString());
+        String jwt = JwtUtil.createJWT(user.getId().toString(), user.getTokenVersion());
         Map<String, String> map = new HashMap<>();
         map.put("error_message", "success");
         map.put("token", jwt);
@@ -50,6 +55,22 @@ public class LoginServiceImpl implements LoginService {
     public Map<String, String> autoLogin() {
         Map<String, String> map = new HashMap<>();
         map.put("error_message", "success");
+        return map;
+    }
+
+    @Override
+    public Map<String, String> logoutAll() {
+        Integer userId = accessTokenExtractor.getCurrentUserId();
+
+        UpdateWrapper<User> updateWrapper = new UpdateWrapper<>();
+        updateWrapper.eq("id", userId)
+                .setSql("token_version = token_version + 1");
+
+        int result = userMapper.update(updateWrapper);
+
+        Map<String, String> map = new HashMap<>();
+        if (result == 1) map.put("error_message", "success");
+        else map.put("error_message", "Database error.");
         return map;
     }
 

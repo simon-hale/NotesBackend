@@ -26,4 +26,9 @@ public class LoginController {
     public Map<String, String> tryLogin() {
         return loginService.autoLogin();
     }
+
+    @PostMapping("/api/user/logout-all/")
+    public Map<String, String> logoutAll() {
+        return loginService.logoutAll();
+    }
 }

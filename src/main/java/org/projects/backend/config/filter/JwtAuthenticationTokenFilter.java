@@ -18,6 +18,7 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.util.Objects;
 
 //    拦截http请求,获取其中jwt令牌,并验证jwt令牌，判断用户的合法性
 //    如果用户非法,抛出异常,如果合法,解析用户信息
@@ -51,20 +52,26 @@ public class JwtAuthenticationTokenFilter extends OncePerRequestFilter {
 //        尝试解析令牌
 //        如果解析成功,说明令牌有效,并直接提取用户信息
 //        如果解析不成功则说明令牌非法,则直接排除异常,其他对象可根据异常得知jwt令牌非法
-        String userid;
+        int userId;
+        Integer tokenVersion;
         try {
             Claims claims = JwtUtil.parseJWT(token);
-            userid = claims.getSubject();
+            userId = Integer.parseInt(claims.getSubject());
+            tokenVersion = claims.get(JwtUtil.TOKEN_VERSION_CLAIM, Integer.class);
         } catch (Exception e) {
-            throw new RuntimeException(e);
+            rejectUnauthorized(response);
+            return;
         }
 
 //        jwt解析成功,获取用户详细信息
-        User user = userMapper.selectById(Integer.parseInt(userid));
+        User user = userMapper.selectById(userId);
 
 //        如果找不到信息,说明虽然令牌和身份信息合法且相互绑定,但是信息没有注册到数据库中
-        if (user == null) {
-            throw new RuntimeException("用户名未注册");
+        if (user == null
+                || tokenVersion == null
+                || !Objects.equals(tokenVersion, user.getTokenVersion())) {
+            rejectUnauthorized(response);
+            return;
         }
 
 //        如果全部成功,返回用户信息,则放行当前令牌对应的用户,使其可以访问受限制的域名
@@ -75,6 +82,20 @@ public class JwtAuthenticationTokenFilter extends OncePerRequestFilter {
         SecurityContextHolder.getContext().setAuthentication(authenticationToken);
 
         filterChain.doFilter(request, response);
+    }
+
+    private void rejectUnauthorized(HttpServletResponse response)
+            throws IOException {
+
+        SecurityContextHolder.clearContext();
+
+        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+        response.setCharacterEncoding("UTF-8");
+        response.setContentType("application/json;charset=UTF-8");
+
+        response.getWriter().write(
+                "{\"error_message\":\"Unauthorized\"}"
+        );
     }
 }
 

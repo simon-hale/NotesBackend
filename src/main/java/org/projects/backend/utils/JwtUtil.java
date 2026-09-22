@@ -31,18 +31,20 @@ public class JwtUtil {
 //    准备前置数据，用于创建令牌
 //    生存时间，默认为14天
     public static final long JWT_TTL = 60 * 60 * 1000L * 24 * 14;  // 有效期14天
+    public static final String TOKEN_VERSION_CLAIM = "tokenVersion";
 //    获得去掉'-'字符的UUID，唯一标志jwt，作为token的一个组成部分
     public static String getUUID() {
         return UUID.randomUUID().toString().replaceAll("-", "");
     }
 
 //    创建一个jwt令牌，作为供其他对象调用的最上层函数，其再调用getJwtBuilder函数执行具体的创建过程
-    public static String createJWT(String subject) {
-        JwtBuilder builder = getJwtBuilder(subject, null, getUUID());
+    public static String createJWT(String subject, Integer tokenVersion) {
+        if (tokenVersion == null) throw new IllegalArgumentException("tokenVersion cannot be null");
+        JwtBuilder builder = getJwtBuilder(subject, tokenVersion, null, getUUID());
         return builder.compact();
     }
 //    用于构建令牌的具体实现过程
-    private static JwtBuilder getJwtBuilder(String subject, Long ttlMillis, String uuid) {
+    private static JwtBuilder getJwtBuilder(String subject, Integer tokenVersion, Long ttlMillis, String uuid) {
         SecretKey secretKey = generalKey();  // 对密钥处理，得到一个可以用于签名的密钥
 //        处理并获取时间信息，用于生成令牌
         long nowMillis = System.currentTimeMillis();
@@ -57,6 +59,7 @@ public class JwtUtil {
         return Jwts.builder()
                 .id(uuid)
                 .subject(subject)
+                .claim(TOKEN_VERSION_CLAIM, tokenVersion)
                 .issuer("sg")
                 .issuedAt(now)
                 .expiration(expDate)

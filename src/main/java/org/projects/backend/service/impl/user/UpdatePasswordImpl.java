@@ -90,7 +90,10 @@ public class UpdatePasswordImpl implements UpdatePassword {
 
         String encodedPassword = passwordEncoder.encode(password);
         UpdateWrapper<User> updateWrapper = new UpdateWrapper<>();
-        updateWrapper.eq("id", userId).set("password", encodedPassword);
+        updateWrapper.eq("id", userId)
+                .eq("password", user.getPassword())
+                .set("password", encodedPassword)
+                .setSql("token_version = token_version + 1");
         int result;
         try {
             result = userMapper.update(updateWrapper);

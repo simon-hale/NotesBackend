@@ -89,6 +89,7 @@ CREATE TABLE `user` (
   `id` int NOT NULL AUTO_INCREMENT,
   `username` varchar(100) DEFAULT NULL,
   `password` varchar(100) NOT NULL,
+  `token_version` int NOT NULL DEFAULT 0,
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=9 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -99,7 +100,7 @@ CREATE TABLE `user` (
 
 LOCK TABLES `user` WRITE;
 /*!40000 ALTER TABLE `user` DISABLE KEYS */;
-INSERT INTO `user` VALUES (8,'root_parent','$2a$10$b7.XqCdcV8QeZUUTDOBik.wAwPDS.VDodLP851AC9C8BLLe/ux6.G');
+INSERT INTO `user` VALUES (8,'root_parent','$2a$10$b7.XqCdcV8QeZUUTDOBik.wAwPDS.VDodLP851AC9C8BLLe/ux6.G', 0);
 /*!40000 ALTER TABLE `user` ENABLE KEYS */;
 UNLOCK TABLES;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;

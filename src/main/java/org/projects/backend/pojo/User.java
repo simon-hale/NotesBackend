@@ -17,4 +17,11 @@ public class User {
     private Integer id;  // 最好用类Integer，这样mybatis-plus不会提示警告
     private String username;
     private String password;
+    private Integer tokenVersion;
+    public User(Integer id, String username, String password) {
+        this.id = id;
+        this.username = username;
+        this.password = password;
+        this.tokenVersion = 0;
+    }
 }
