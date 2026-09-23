@@ -53,8 +53,10 @@ public class LoginServiceImpl implements LoginService {
 
     @Override
     public Map<String, String> autoLogin() {
+        User user = accessTokenExtractor.getCurrentUser();
         Map<String, String> map = new HashMap<>();
         map.put("error_message", "success");
+        map.put("username", user.getUsername());
         return map;
     }
 

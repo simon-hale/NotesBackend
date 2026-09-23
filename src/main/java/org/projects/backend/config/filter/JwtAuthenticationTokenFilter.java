@@ -9,8 +9,8 @@ import org.jetbrains.annotations.NotNull;
 import org.projects.backend.mapper.UserMapper;
 import org.projects.backend.pojo.User;
 import org.projects.backend.service.impl.UserDetailsImpl;
+import org.projects.backend.utils.AuthCookieUtil;
 import org.projects.backend.utils.JwtUtil;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
@@ -20,88 +20,165 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
 import java.util.Objects;
 
-//    拦截http请求,获取其中jwt令牌,并验证jwt令牌，判断用户的合法性
-//    如果用户非法,抛出异常,如果合法,解析用户信息
-
-//    说明:令牌中不是有userid或者username吗?为什么还要解析
-//    解答:令牌和身份信息是相互绑定的,是用来登陆的,仅包含必要的身份信息,但是程序并不只是使用身份信息,还要得知其他的各项信息
-//    所以说,解析信息就是根据令牌中的身份信息(如果可以),就根据这个身份信息把其他信息从数据库中读出来,供外界使用
-
 @Component
-public class JwtAuthenticationTokenFilter extends OncePerRequestFilter {
-//    用于在数据库中查找数据的具体信息,需要根据具体项目细节修改
-    @Autowired
-    private UserMapper userMapper;
+public class JwtAuthenticationTokenFilter
+        extends OncePerRequestFilter {
 
-//    验证jwt令牌,并当jwt令牌合法时,解析用户信息
+    private final UserMapper userMapper;
+    private final AuthCookieUtil authCookieUtil;
+
+    public JwtAuthenticationTokenFilter(
+            UserMapper userMapper,
+            AuthCookieUtil authCookieUtil) {
+
+        this.userMapper = userMapper;
+        this.authCookieUtil = authCookieUtil;
+    }
+
     @Override
-    protected void doFilterInternal(HttpServletRequest request, @NotNull HttpServletResponse response, @NotNull FilterChain filterChain) throws ServletException, IOException {
+    protected boolean shouldNotFilter(
+            @NotNull HttpServletRequest request) {
 
-//        从前端的数据中的headers部分提取令牌
-//        因为此处定义Authorization,所以前端headers中的字段名也是这个,并且需要"Bearer "+令牌
-        String token = request.getHeader("Authorization");
+        if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
+            return true;
+        }
 
-        if (!StringUtils.hasText(token) || !token.startsWith("Bearer ")) {
+        String path = request.getServletPath();
+
+        /*
+         * 登录接口必须忽略已有 Cookie。
+         *
+         * 否则浏览器如果保存了一个已经过期的 Cookie，
+         * 用户连重新登录接口都无法调用。
+         */
+        return "/api/user/token/".equals(path)
+                || "/api/user/login/".equals(path)
+                || "/api/user/register/".equals(path)
+                || "/api/user/csrf/".equals(path);
+    }
+
+    @Override
+    protected void doFilterInternal(
+            @NotNull HttpServletRequest request,
+            @NotNull HttpServletResponse response,
+            @NotNull FilterChain filterChain)
+            throws ServletException, IOException {
+
+        String authorization =
+                request.getHeader("Authorization");
+
+        String token;
+        boolean cookieAuthenticated = false;
+
+        /*
+         * Bearer 优先。
+         *
+         * 如果客户端明确提供 Bearer，但 Bearer 无效，
+         * 不允许自动 fallback 到 Cookie。
+         */
+        if (StringUtils.hasText(authorization)
+                && authorization.startsWith("Bearer ")) {
+
+            token = authorization.substring(7);
+
+        } else {
+
+            token = authCookieUtil.getAuthToken(request);
+            cookieAuthenticated = StringUtils.hasText(token);
+        }
+
+        if (!StringUtils.hasText(token)) {
             filterChain.doFilter(request, response);
             return;
         }
 
-//        去掉多余部分"Bearer "仅保留纯令牌
-        token = token.substring(7);
-
-//        尝试解析令牌
-//        如果解析成功,说明令牌有效,并直接提取用户信息
-//        如果解析不成功则说明令牌非法,则直接排除异常,其他对象可根据异常得知jwt令牌非法
         int userId;
         Integer tokenVersion;
+
         try {
+
             Claims claims = JwtUtil.parseJWT(token);
-            userId = Integer.parseInt(claims.getSubject());
-            tokenVersion = claims.get(JwtUtil.TOKEN_VERSION_CLAIM, Integer.class);
+
+            userId = Integer.parseInt(
+                    claims.getSubject()
+            );
+
+            tokenVersion = claims.get(
+                    JwtUtil.TOKEN_VERSION_CLAIM,
+                    Integer.class
+            );
+
         } catch (Exception e) {
-            rejectUnauthorized(response);
+
+            rejectUnauthorized(
+                    response,
+                    cookieAuthenticated
+            );
+
             return;
         }
 
-//        jwt解析成功,获取用户详细信息
         User user = userMapper.selectById(userId);
 
-//        如果找不到信息,说明虽然令牌和身份信息合法且相互绑定,但是信息没有注册到数据库中
         if (user == null
                 || tokenVersion == null
-                || !Objects.equals(tokenVersion, user.getTokenVersion())) {
-            rejectUnauthorized(response);
+                || !Objects.equals(
+                tokenVersion,
+                user.getTokenVersion())) {
+
+            rejectUnauthorized(
+                    response,
+                    cookieAuthenticated
+            );
+
             return;
         }
 
-//        如果全部成功,返回用户信息,则放行当前令牌对应的用户,使其可以访问受限制的域名
-        UserDetailsImpl loginUser = new UserDetailsImpl(user);
-        UsernamePasswordAuthenticationToken authenticationToken =
-                new UsernamePasswordAuthenticationToken(loginUser, null, null);
+        UserDetailsImpl loginUser =
+                new UserDetailsImpl(user);
 
-        SecurityContextHolder.getContext().setAuthentication(authenticationToken);
+        UsernamePasswordAuthenticationToken authenticationToken =
+                new UsernamePasswordAuthenticationToken(
+                        loginUser,
+                        null,
+                        null
+                );
+
+        SecurityContextHolder.getContext()
+                .setAuthentication(authenticationToken);
 
         filterChain.doFilter(request, response);
     }
 
-    private void rejectUnauthorized(HttpServletResponse response)
+    private void rejectUnauthorized(
+            HttpServletResponse response,
+            boolean cookieAuthenticated)
             throws IOException {
 
         SecurityContextHolder.clearContext();
 
-        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+        /*
+         * 如果坏掉的是 Web Cookie，
+         * 顺便让浏览器删除失效 Cookie。
+         *
+         * Android Bearer 失败则不会操作 Cookie。
+         */
+        if (cookieAuthenticated) {
+            authCookieUtil.clearSessionCookies(response);
+        }
+
+        response.setStatus(
+                HttpServletResponse.SC_UNAUTHORIZED
+        );
+
         response.setCharacterEncoding("UTF-8");
-        response.setContentType("application/json;charset=UTF-8");
+
+        response.setContentType(
+                "application/json;charset=UTF-8"
+        );
 
         response.getWriter().write(
                 "{\"error_message\":\"Unauthorized\"}"
         );
     }
 }
-
-//    注意:本类中的方法不会被项目中的新加类直接调用,被AuthenticationManager类对象间接调用
-//    本类的作用是对访问受限域名的用户进行合法性验证,通过调用AuthenticationManager类方法简介调用本类实现验证
-//    因此,如果想实现验证jwt的操作步骤:
-//    1. 引入此类
-//    2. 修正Mapper类为当前项目,一边数据库操作
-//    3. 在受限域名的函数中使用AuthenticationManager来验证jwt令牌的合法性并获取用户信息,进而执行下一步操作

@@ -24,3 +24,17 @@ aliyun.oss.domain=your-oss-domain
 
 # JWT
 jwt.key=${JWT_KEY}
+
+# Browser authentication / CORS
+
+# Comma-separated exact frontend origins.
+# Do not use "*".
+app.cors.allowed-origins=${CORS_ALLOWED_ORIGINS:http://localhost:8080}
+
+# Production HTTPS: true.
+# Local HTTP development: false.
+app.auth.cookie-secure=${AUTH_COOKIE_SECURE:true}
+
+# Same-site frontend/backend: Strict.
+# Truly cross-site frontend/backend: None + Secure=true.
+app.auth.cookie-same-site=${AUTH_COOKIE_SAME_SITE:Strict}

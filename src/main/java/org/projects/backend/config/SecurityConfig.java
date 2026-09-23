@@ -1,17 +1,10 @@
 package org.projects.backend.config;
 
-//    此类用于①设置密码加密方法②在解决了跨域的情况下,控制允许直接访问的域名
-//    注意:本类不直接实现密码加密,具体的加密函数已给出,直接调用
-//    spring-boot-starter-security类会将前端输入的密码与后端进行判定
-//    但是默认判定加密之后的密码,会调用SecurityConfig的passwordEncoder并得到一个加密方法PasswordEncoder
-//    因此,本类的作用就是提供一个SecurityConfig类的passwordEncoder方法并返回一个加密方法
-
-//    此类不被任何类调用
-//    使用方法:
-//    1. 引入此类,通过passwordEncoder函数设置加密方法(不用变动)
-//    2. 其他类中直接注入PasswordEncoder类,定义其对象passwordEncoder,调用passwordEncoder.encode(password)函数即可对密码加密
-
+import jakarta.servlet.http.Cookie;
+import jakarta.servlet.http.HttpServletRequest;
 import org.projects.backend.config.filter.JwtAuthenticationTokenFilter;
+import org.projects.backend.utils.AuthCookieUtil;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -23,7 +16,9 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
+import org.springframework.security.web.csrf.CsrfFilter;
+import org.springframework.util.StringUtils;
 
 @Configuration
 @EnableWebSecurity
@@ -35,31 +30,142 @@ public class SecurityConfig {
         this.jwtAuthenticationTokenFilter = jwtAuthenticationTokenFilter;
     }
 
-//    给出加密方法
-//    指定BCrypt加密算法，封装为函数，使用这个类的方法对字符串加密
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
     }
 
-//    在解决了跨域的情况下,配置允许直接访问的域名
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    public CookieCsrfTokenRepository csrfTokenRepository(
+            @Value("${app.auth.cookie-secure:true}")
+            boolean cookieSecure,
+            @Value("${app.auth.cookie-same-site:Strict}")
+            String cookieSameSite) {
+
+        CookieCsrfTokenRepository repository =
+                CookieCsrfTokenRepository.withHttpOnlyFalse();
+
+        repository.setCookieCustomizer(builder -> builder
+                .secure(cookieSecure)
+                .sameSite(cookieSameSite)
+                .path("/"));
+
+        return repository;
+    }
+
+    @Bean
+    public SecurityFilterChain securityFilterChain(
+            HttpSecurity http,
+            CookieCsrfTokenRepository csrfTokenRepository)
+            throws Exception {
+
         http
-                .csrf(csrf -> csrf.disable())
+                .cors(cors -> {})
+                .csrf(csrf -> csrf
+                        .csrfTokenRepository(csrfTokenRepository)
+                        .csrfTokenRequestHandler(
+                                new SpaCsrfTokenRequestHandler())
+                        .requireCsrfProtectionMatcher(
+                                SecurityConfig::requiresCsrfProtection))
                 .sessionManagement(session -> session
-                        .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                        .sessionCreationPolicy(
+                                SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-//                        下行表示放行给未通过验证的用户的域名
                         .requestMatchers(
                                 "/api/user/token/",
-                                "/api/user/register/").permitAll()
-                        .requestMatchers(HttpMethod.OPTIONS).permitAll()
-                        .anyRequest().authenticated());
+                                "/api/user/login/",
+                                "/api/user/register/",
+                                "/api/user/csrf/")
+                        .permitAll()
+                        .requestMatchers(HttpMethod.OPTIONS)
+                        .permitAll()
+                        .anyRequest()
+                        .authenticated());
 
-        http.addFilterBefore(jwtAuthenticationTokenFilter, UsernamePasswordAuthenticationFilter.class);
+        /*
+         * JWT 必须先于 CsrfFilter 验证。
+         *
+         * Cookie JWT 无效：
+         *      先返回 401
+         *
+         * Cookie JWT 有效：
+         *      再执行 CSRF 检查
+         *
+         * Bearer：
+         *      JWT 正常验证，但 CSRF matcher 会跳过。
+         */
+        http.addFilterBefore(
+                jwtAuthenticationTokenFilter,
+                CsrfFilter.class
+        );
 
         return http.build();
+    }
+
+    private static boolean requiresCsrfProtection(
+            HttpServletRequest request) {
+
+        String method = request.getMethod();
+
+        if ("GET".equalsIgnoreCase(method)
+                || "HEAD".equalsIgnoreCase(method)
+                || "TRACE".equalsIgnoreCase(method)
+                || "OPTIONS".equalsIgnoreCase(method)) {
+            return false;
+        }
+
+        String path = request.getServletPath();
+
+        /* Native token login、registration 和只读 auto-login
+         * 不使用浏览器 Cookie CSRF。
+         */
+        if ("/api/user/token/".equals(path)
+                || "/api/user/register/".equals(path)
+                || "/api/user/auto-login/".equals(path)) {
+            return false;
+        }
+
+        /*
+         * Web Cookie 登录本身需要防止 Login CSRF。
+         */
+        if ("/api/user/login/".equals(path)) {
+            return true;
+        }
+
+        /*
+         * Android / 原生客户端显式发送 Bearer。
+         * 浏览器不会自动附加 Authorization Bearer，
+         * 因此不属于 Cookie CSRF 场景。
+         */
+        String authorization =
+                request.getHeader("Authorization");
+
+        if (StringUtils.hasText(authorization)
+                && authorization.startsWith("Bearer ")) {
+            return false;
+        }
+
+        return hasCookie(
+                request,
+                AuthCookieUtil.AUTH_COOKIE_NAME
+        );
+    }
+
+    private static boolean hasCookie(
+            HttpServletRequest request,
+            String cookieName) {
+
+        Cookie[] cookies = request.getCookies();
+
+        if (cookies == null) return false;
+
+        for (Cookie cookie : cookies) {
+            if (cookieName.equals(cookie.getName())) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     @Bean
