@@ -11,9 +11,8 @@ import org.projects.backend.utils.LanguagesSelector;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 
-import java.util.HashMap;
-import java.util.Map;
 import java.util.Objects;
 
 @Service
@@ -108,44 +107,139 @@ public class DeleteFileInfoServiceImpl implements DeleteFileInfoService {
             return resp;
         }
 
-        int deleted;
-
-        try {
-            deleted = fileMapper.deleteById(id);
-        } catch (Exception e) {
-            switch (language) {
-                case LanguagesSelector.zh_CN: resp.put("error_message", "数据库操作出错"); break;
-                case LanguagesSelector.en_US:
-                default: resp.put("error_message", "Database operation error.");
-            }
-            return resp;
-        }
-
-        if (deleted != 1) {
-            switch (language) {
-                case LanguagesSelector.zh_CN: resp.put("error_message", "数据库删除返回值非1"); break;
-                case LanguagesSelector.en_US:
-                default: resp.put("error_message", "Database deletion returned a non-1 value.");
-            }
-            return resp;
-        }
-
-        String objectKey = "user/" + file.getUserId() + "/" + file.getStringOfPath() + file.getName();
+        String objectKey =
+                "user/"
+                        + file.getUserId()
+                        + "/"
+                        + file.getStringOfPath()
+                        + file.getName();
 
         OSS ossClient = null;
+
         try {
             ossClient = new OSSClientBuilder()
-                    .build("https://" + ossRegion + domain, accessKeyId, accessKeySecret);
+                    .build(
+                            "https://" + ossRegion + domain,
+                            accessKeyId,
+                            accessKeySecret
+                    );
+
             ossClient.deleteObject(bucket, objectKey);
-            resp.put("error_message", "success");
+
+        } catch (Exception e) {
+
+            switch (language) {
+                case LanguagesSelector.zh_CN:
+                    resp.put(
+                            "error_message",
+                            "OSS文件删除失败，数据库记录未删除"
+                    );
+                    break;
+
+                case LanguagesSelector.en_US:
+                default:
+                    resp.put(
+                            "error_message",
+                            "Failed to delete the OSS object. "
+                                    + "The database record was not deleted."
+                    );
+            }
+
+            return resp;
+
+        } finally {
+            if (ossClient != null) {
+                ossClient.shutdown();
+            }
+        }
+
+        int deleted;
+        try {
+            QueryWrapper<File> deleteWrapper = new QueryWrapper<File>()
+                    .eq("id", id)
+                    .eq("user_id", userId)
+                    .eq("parent_id", file.getParentId())
+                    .eq("name", file.getName());
+            if (file.getStringOfPath() == null) {
+                deleteWrapper.isNull("string_of_path");
+            } else {
+                deleteWrapper.eq("string_of_path", file.getStringOfPath());
+            }
+            deleted = fileMapper.delete(deleteWrapper);
         } catch (Exception e) {
             switch (language) {
-                case LanguagesSelector.zh_CN: resp.put("error_message", "数据库记录已删除，但OSS中旧文件清理失败"); break;
+                case LanguagesSelector.zh_CN:
+                    resp.put(
+                            "error_message",
+                            "OSS文件已删除，但数据库记录删除失败，请重试"
+                    );
+                    break;
                 case LanguagesSelector.en_US:
-                default: resp.put("error_message", "Database deleted, but OSS cleanup failed.");
+                default:
+                    resp.put(
+                            "error_message",
+                            "The OSS object was deleted, but the database "
+                                    + "record deletion failed. Please retry."
+                    );
             }
-        } finally {
-            if (ossClient != null) ossClient.shutdown();
+            return resp;
+        }
+
+        if (deleted == 1) {
+            resp.put("error_message", "success");
+            return resp;
+        }
+
+        if (deleted == 0) {
+            try {
+                File currentFile = fileMapper.selectById(id);
+                if (currentFile == null) {
+                    resp.put("error_message", "success");
+                    return resp;
+                }
+                switch (language) {
+                    case LanguagesSelector.zh_CN:
+                        resp.put(
+                                "error_message",
+                                "文件状态已发生变化，数据库记录未删除，请刷新后重试"
+                        );
+                        break;
+                    case LanguagesSelector.en_US:
+                    default:
+                        resp.put(
+                                "error_message",
+                                "The file state has changed. "
+                                        + "The database record was not deleted. "
+                                        + "Refresh and try again."
+                        );
+                }
+                return resp;
+            } catch (Exception e) {
+                switch (language) {
+                    case LanguagesSelector.zh_CN:
+                        resp.put(
+                                "error_message",
+                                "数据库删除未生效，且文件状态复查失败，请刷新后重试"
+                        );
+                        break;
+                    case LanguagesSelector.en_US:
+                    default:
+                        resp.put(
+                                "error_message",
+                                "The database deletion did not take effect, "
+                                        + "and the file state could not be verified. "
+                                        + "Refresh and try again."
+                        );
+                }
+                return resp;
+            }
+        }
+        switch (language) {
+            case LanguagesSelector.zh_CN:
+                resp.put("error_message", "数据库删除返回值异常");
+                break;
+            case LanguagesSelector.en_US:
+            default: resp.put("error_message", "Database deletion returned an unexpected value.");
         }
 
         return resp;

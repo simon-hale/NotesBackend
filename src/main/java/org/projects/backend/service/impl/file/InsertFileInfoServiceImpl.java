@@ -14,13 +14,14 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import java.time.ZoneId;
 import java.time.LocalDateTime;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import com.aliyun.oss.model.SimplifiedObjectMeta;
+import org.springframework.dao.DuplicateKeyException;
 
 import com.aliyun.oss.OSS;
 import com.aliyun.oss.OSSClientBuilder;
@@ -191,40 +192,69 @@ public class InsertFileInfoServiceImpl implements InsertFileInfoService {
 
         String objectKey = "user/" + userId + "/" + stringOfPath + fileName;
 
-        OSS ossClient;
+        OSS ossClient = null;
+        LocalDateTime ossLastModifiedTime;
+
         try {
             ossClient = new OSSClientBuilder()
-                    .build("https://" + ossRegion + domain, accessKeyId, accessKeySecret);
-        } catch (Exception e) {
-            switch (language) {
-                case LanguagesSelector.zh_CN: resp.put("error_message", "OSS客户端创建失败"); break;
-                case LanguagesSelector.en_US:
-                default: resp.put("error_message", "Error building OSS client.");
-            }
-            return resp;
-        }
+                    .build(
+                            "https://" + ossRegion + domain,
+                            accessKeyId,
+                            accessKeySecret
+                    );
 
-        boolean exists;
-        try {
-            exists = ossClient.doesObjectExist(bucket, objectKey);
+            if (!ossClient.doesObjectExist(bucket, objectKey)) {
+                switch (language) {
+                    case LanguagesSelector.zh_CN:
+                        resp.put("error_message", "文件不存在");
+                        break;
+                    case LanguagesSelector.en_US:
+                    default:
+                        resp.put("error_message", "File does not exist.");
+                }
+                return resp;
+            }
+
+            SimplifiedObjectMeta objectMeta =
+                    ossClient.getSimplifiedObjectMeta(bucket, objectKey);
+
+            if (objectMeta.getLastModified() == null) {
+                switch (language) {
+                    case LanguagesSelector.zh_CN:
+                        resp.put(
+                                "error_message",
+                                "无法获取OSS文件最后修改时间"
+                        );
+                        break;
+                    case LanguagesSelector.en_US:
+                    default:
+                        resp.put(
+                                "error_message",
+                                "Unable to obtain the OSS object last-modified time."
+                        );
+                }
+                return resp;
+            }
+
+            ossLastModifiedTime = LocalDateTime.ofInstant(
+                    objectMeta.getLastModified().toInstant(),
+                    ZoneId.systemDefault()
+            ).withNano(0);
+
         } catch (Exception e) {
             switch (language) {
-                case LanguagesSelector.zh_CN: resp.put("error_message", "OSS客户端请求失败"); break;
+                case LanguagesSelector.zh_CN:
+                    resp.put("error_message", "OSS客户端请求失败");
+                    break;
                 case LanguagesSelector.en_US:
-                default: resp.put("error_message", "Error requesting OSS client.");
+                default:
+                    resp.put("error_message", "Error requesting OSS client.");
             }
             return resp;
         } finally {
-            ossClient.shutdown();
-        }
-
-        if (!exists) {
-            switch (language) {
-                case LanguagesSelector.zh_CN: resp.put("error_message", "文件不存在"); break;
-                case LanguagesSelector.en_US:
-                default: resp.put("error_message", "File does not exist.");
+            if (ossClient != null) {
+                ossClient.shutdown();
             }
-            return resp;
         }
 
         List<File> curFileList;
@@ -254,7 +284,7 @@ public class InsertFileInfoServiceImpl implements InsertFileInfoService {
                             null,
                             new UpdateWrapper<File>()
                                     .eq("id", curFileList.getFirst().getId())
-                                    .set("last_modified_time", LocalDateTime.now())
+                                    .set("last_modified_time", ossLastModifiedTime)
                     );
                     resp.put("error_message", updated == 1 ? "success" : switch (language) {
                         case LanguagesSelector.zh_CN -> "数据库更新错误";
@@ -272,8 +302,8 @@ public class InsertFileInfoServiceImpl implements InsertFileInfoService {
             return resp;
         }
 
-        LocalDateTime creationTime = java.time.LocalDateTime.now();
-        LocalDateTime lastModifiedTime = java.time.LocalDateTime.now();
+        LocalDateTime creationTime = ossLastModifiedTime;
+        LocalDateTime lastModifiedTime = ossLastModifiedTime;
         File file = new File();
         file.setName(fileName);
         file.setParentId(parentId);
@@ -290,6 +320,9 @@ public class InsertFileInfoServiceImpl implements InsertFileInfoService {
         int inserted;
         try {
             inserted = fileMapper.insert(file);
+        } catch (DuplicateKeyException e) {
+            resp.put("error_message", "success");
+            return resp;
         } catch (Exception e) {
             switch (language) {
                 case LanguagesSelector.zh_CN: resp.put("error_message", "数据库操作出错"); break;

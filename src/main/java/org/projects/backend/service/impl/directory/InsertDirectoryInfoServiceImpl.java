@@ -8,6 +8,7 @@ import org.projects.backend.service.directory.InsertDirectoryInfoService;
 import org.projects.backend.utils.AccessTokenExtractor;
 import org.projects.backend.utils.LanguagesSelector;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 
 import java.util.Objects;
@@ -116,7 +117,18 @@ public class InsertDirectoryInfoServiceImpl implements InsertDirectoryInfoServic
                 directory.setParentId(parentId);
                 directory.setUserId(userId);
 
-                int inserted = directoryMapper.insert(directory);
+                int inserted;
+                try {
+                    inserted = directoryMapper.insert(directory);
+                } catch (DuplicateKeyException e) {
+                    switch (language) {
+                        case LanguagesSelector.zh_CN: resp.put("error_message", "该目录名在当前目录中已存在"); break;
+                        case LanguagesSelector.en_US:
+                        default:
+                            resp.put("error_message", "This name already exists in current directory.");
+                    }
+                    return resp;
+                }
 
                 resp.put(
                         "error_message",

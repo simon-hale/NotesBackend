@@ -10,6 +10,7 @@ import org.projects.backend.utils.AccessTokenExtractor;
 import org.projects.backend.utils.LanguagesSelector;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.dao.DuplicateKeyException;
 
 import java.util.Objects;
 
@@ -171,8 +172,22 @@ public class UpdateDirectoryInfoServiceImpl implements UpdateDirectoryInfoServic
                     new UpdateWrapper<Directory>()
                             .eq("id", id)
                             .eq("user_id", userId)
+                            .eq("name", oldName)
                             .set("name", name)
             );
+        } catch (DuplicateKeyException e) {
+            switch (language) {
+                case LanguagesSelector.zh_CN:
+                    resp.put("error_message", "该目录名在当前目录中已存在");
+                    break;
+                case LanguagesSelector.en_US:
+                default:
+                    resp.put(
+                            "error_message",
+                            "This name already exists in current directory."
+                    );
+            }
+            return resp;
         } catch (Exception e) {
             switch (language) {
                 case LanguagesSelector.zh_CN: resp.put("error_message", "数据库操作错误"); break;
@@ -182,14 +197,36 @@ public class UpdateDirectoryInfoServiceImpl implements UpdateDirectoryInfoServic
             return resp;
         }
 
-        resp.put(
-                "error_message",
-                modifySuccess == 1 ? "success" : switch (language) {
-                    case LanguagesSelector.zh_CN -> "数据库更新返回值非1";
-                    case LanguagesSelector.en_US -> "Database update returned a non-1 value.";
-                    default -> "Database update returned a non-1 value.";
-                }
-        );
+        if (modifySuccess == 1) {
+            resp.put("error_message", "success");
+            return resp;
+        }
+
+        try {
+            Directory currentDirectory = directoryMapper.selectById(id);
+
+            if (currentDirectory != null
+                    && Objects.equals(currentDirectory.getUserId(), userId)
+                    && Objects.equals(currentDirectory.getName(), name)) {
+
+                resp.put("error_message", "success");
+                return resp;
+            }
+        } catch (Exception e) {
+            switch (language) {
+                case LanguagesSelector.zh_CN: resp.put("error_message", "重命名结果复查失败"); break;
+                case LanguagesSelector.en_US:
+                default: resp.put("error_message", "Failed to verify the rename result.");
+            }
+            return resp;
+        }
+
+        switch (language) {
+            case LanguagesSelector.zh_CN: resp.put("error_message", "目录状态已发生变化，请刷新后重试"); break;
+            case LanguagesSelector.en_US:
+            default: resp.put("error_message", "The directory state has changed. Refresh and try again.");
+        }
+
         return resp;
     }
 }
