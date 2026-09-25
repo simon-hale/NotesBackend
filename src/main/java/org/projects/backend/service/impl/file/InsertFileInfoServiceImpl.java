@@ -278,25 +278,16 @@ public class InsertFileInfoServiceImpl implements InsertFileInfoService {
                     case LanguagesSelector.en_US:
                     default: resp.put("error_message", "Multiple files with the same name exist.");
                 }
-            }else{
-                try {
-                    int updated = fileMapper.update(
-                            null,
-                            new UpdateWrapper<File>()
-                                    .eq("id", curFileList.getFirst().getId())
-                                    .set("last_modified_time", ossLastModifiedTime)
-                    );
-                    resp.put("error_message", updated == 1 ? "success" : switch (language) {
-                        case LanguagesSelector.zh_CN -> "数据库更新错误";
-                        case LanguagesSelector.en_US -> "SQL update error.";
-                        default -> "SQL update error.";
-                    });
-                } catch (Exception e) {
-                    switch (language) {
-                        case LanguagesSelector.zh_CN: resp.put("error_message", "数据库更新出错"); break;
-                        case LanguagesSelector.en_US:
-                        default: resp.put("error_message", "SQL update error.");
-                    }
+                return resp;
+            }
+            try {
+                updateLastModifiedTimeIfNewer(userId, parentId, fileName, ossLastModifiedTime);
+                resp.put("error_message", "success");
+            } catch (Exception e) {
+                switch (language) {
+                    case LanguagesSelector.zh_CN: resp.put("error_message", "文件最后修改时间更新失败"); break;
+                    case LanguagesSelector.en_US:
+                    default: resp.put("error_message", "Failed to update the file last-modified time.");
                 }
             }
             return resp;
@@ -321,7 +312,16 @@ public class InsertFileInfoServiceImpl implements InsertFileInfoService {
         try {
             inserted = fileMapper.insert(file);
         } catch (DuplicateKeyException e) {
-            resp.put("error_message", "success");
+            try {
+                updateLastModifiedTimeIfNewer(userId, parentId, fileName, ossLastModifiedTime);
+                resp.put("error_message", "success");
+            } catch (Exception updateException) {
+                switch (language) {
+                    case LanguagesSelector.zh_CN: resp.put("error_message", "并发文件元数据更新失败"); break;
+                    case LanguagesSelector.en_US:
+                    default: resp.put("error_message", "Failed to converge concurrent file metadata.");
+                }
+            }
             return resp;
         } catch (Exception e) {
             switch (language) {
@@ -343,5 +343,17 @@ public class InsertFileInfoServiceImpl implements InsertFileInfoService {
         );
 
         return resp;
+    }
+
+    private void updateLastModifiedTimeIfNewer(Integer userId, Integer parentId, String fileName, LocalDateTime ossLastModifiedTime) {
+        fileMapper.update(
+                null,
+                new UpdateWrapper<File>()
+                        .eq("user_id", userId)
+                        .eq("parent_id", parentId)
+                        .eq("name", fileName)
+                        .lt("last_modified_time", ossLastModifiedTime)
+                        .set("last_modified_time", ossLastModifiedTime)
+        );
     }
 }

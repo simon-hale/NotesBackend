@@ -281,7 +281,8 @@ public class OssStsController {
         List<String> actions = switch (usage) {
             case StsUsageSelector.SINGLE_FILE_UPLOAD -> List.of(
                     "oss:PutObject",
-                    "oss:AbortMultipartUpload"
+                    "oss:AbortMultipartUpload",
+                    "oss:ListParts"
             );
             default -> List.of();
         };
@@ -331,6 +332,7 @@ public class OssStsController {
         result.put("accessKeyId", cred.getAccessKeyId());
         result.put("accessKeySecret", cred.getAccessKeySecret());
         result.put("securityToken", cred.getSecurityToken());
+        result.put("expiration", cred.getExpiration());
         result.put("bucket", bucket);
         result.put("region", ossRegion);
         result.put("objectKey", objectKey);
